@@ -30,12 +30,6 @@ if(FOUND_SOBEC):
 else:
     logger.error('You need to install Sobec !')
 
-# FOUND_MIM_SOLVERS = importlib.util.find_spec("mim_solvers") is not None
-# if(FOUND_MIM_SOLVERS):
-#     import mim_solvers 
-# else:
-#     logger.error('You need to install mim_solvers !')
-
 
 class OptimalControlProblemClassical(OptimalControlProblemAbstract):
   '''
@@ -254,25 +248,4 @@ class OptimalControlProblemClassical(OptimalControlProblemAbstract):
   # Finish
     self.success_log()
     return problem
-
-
-  # # Creating the DDP solver 
-  #   if(self.SOLVER == 'sqp'):
-  #     logger.warning("Using the SQP solver.")
-  #     ddp = mim_solvers.SolverSQP(problem)
-  #   elif(self.SOLVER == 'fddp'):
-  #     logger.warning("Using the FDDP solver.")
-  #     ddp = mim_solvers.SolverFDDP(problem)
-        
-  # # Callbacks
-  #   if(callbacks):
-  #     ddp.setCallbacks([crocoddyl.CallbackLogger(),
-  #                       crocoddyl.CallbackVerbose()])
-  
-  # # Finish
-  #   self.success_log()
-  #   return ddp
-
-
-
 

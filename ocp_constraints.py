@@ -172,32 +172,5 @@ class OptimalControlProblemClassicalWithConstraints(OptimalControlProblemClassic
     
     return problem
 
-  
-  # # Creating the DDP solver 
-  #   if(self.SOLVER == 'proxqp'):
-  #     logger.warning("Using the ProxQP solver.")
-  #     ddp = mim_solvers.SolverProxQP(problem)
-  #   elif(self.SOLVER == 'cssqp'):
-  #     logger.warning("Using the CSSQP solver.")
-  #     ddp = mim_solvers.SolverCSQP(problem)
-      
-  # # Callbacks & solver parameters
-  #   ddp.with_callbacks  = callbacks
-  #   ddp.use_filter_ls   = self.use_filter_ls
-  #   ddp.filter_size     = self.filter_size
-  #   ddp.warm_start      = self.warm_start
-  #   ddp.termination_tol = self.solver_termination_tolerance
-  #   ddp.max_qp_iters    = self.max_qp_iter
-  #   ddp.eps_abs         = self.qp_termination_tol_abs
-  #   ddp.eps_rel         = self.qp_termination_tol_rel
-  #   ddp.warm_start_y    = self.warm_start_y
-  #   ddp.reset_rho       = self.reset_rho
-  
-  # # Finish
-  #   self.success_log()
-    
-  #   return ddp
-
-
 
     
