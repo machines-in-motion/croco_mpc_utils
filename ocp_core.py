@@ -14,8 +14,6 @@ import crocoddyl
 import pinocchio as pin
 import hppfcl
 
-import importlib
-
 import pathlib
 import os
 os.sys.path.insert(1, str(pathlib.Path('.').absolute()))
@@ -24,13 +22,6 @@ from croco_mpc_utils.utils import CustomLogger, GLOBAL_LOG_LEVEL, GLOBAL_LOG_FOR
 logger = CustomLogger(__name__, GLOBAL_LOG_LEVEL, GLOBAL_LOG_FORMAT).logger
 
 
-
-FOUND_SOBEC = importlib.util.find_spec("sobec") is not None
-if(FOUND_SOBEC):
-    import sobec 
-else:
-    logger.warning('You need to install Sobec !')
-    
     
 class OptimalControlProblemAbstract:
   '''
@@ -107,63 +98,42 @@ class OptimalControlProblemAbstract:
       pinocchioReferenceFrame = pin.LOCAL_WORLD_ALIGNED
     else: 
       logger.error('Unknown pinocchio reference frame. Please select0 in {LOCAL, WORLD, LOCAL_WORLD_ALIGNED} !')
-    # logger.debug("found pin ref frame = "+str(pinocchioReferenceFrame))
-    
-    # Detect contact model type and create Crocoddyl contact model 
-    if(FOUND_SOBEC):
-      if('1D' in contactModelType):
-        if('x' in contactModelType):
-          constrainedAxis = sobec.sobec_pywrap.Vector3MaskType.x
-        elif('y' in contactModelType):
-          constrainedAxis = sobec.sobec_pywrap.Vector3MaskType.y
-        elif('z' in contactModelType):
-          constrainedAxis = sobec.sobec_pywrap.Vector3MaskType.z
-        else: logger.error('Unknown 1D contact model. Please select 1D contactModelType in {1Dx, 1Dy, 1Dz} !')
-        contactModel = sobec.ContactModel1D(state, 
-                                                contactModelFrameId, 
-                                                contactModelTranslationRef, #[constrainedAxis], 
-                                                actuation.nu,
-                                                contactModelGains,
-                                                constrainedAxis,
-                                                pinocchioReferenceFrame)  
-      # 3D contact model = constraint in (LOCAL) x,y,z translations (fixed position)
-      elif(contactModelType == '3D'):
-        contactModel = sobec.ContactModel3D(state, 
-                                                contactModelFrameId, 
-                                                contactModelTranslationRef, 
-                                                contactModelGains,
-                                                pinocchioReferenceFrame)  
-      # 6D contact model = constraint in (LOCAL) x,y,z translations **and** rotations (fixed placement)
-      elif(contactModelType == '6D'):
-        contactModelPlacementRef = pin.SE3(contactModelRotationRef, contactModelTranslationRef)
-        contactModel = sobec.ContactModel6D(state, 
-                                                contactModelFrameId, 
-                                                contactModelPlacementRef, 
-                                                contactModelGains)     
-      else: logger.error("Unknown contactModelType. Please select in {1Dx, 1Dy, 1Dz, 3D, 6D}")
-    else:
-      if('1D' in contactModelType):
-        contactModel = crocoddyl.ContactModel1D(state, 
-                                                contactModelFrameId, 
-                                                contactModelTranslationRef[2],
-                                                actuation.nu,
-                                                contactModelGains)  
-      # 3D contact model = constraint in (LOCAL) x,y,z translations (fixed position)
-      elif(contactModelType == '3D'):
-        contactModel = crocoddyl.ContactModel3D(state, 
-                                                contactModelFrameId, 
-                                                contactModelTranslationRef,
-                                                actuation.nu, 
-                                                contactModelGains)  
-      # 6D contact model = constraint in (LOCAL) x,y,z translations **and** rotations (fixed placement)
-      elif(contactModelType == '6D'):
-        contactModelPlacementRef = pin.SE3(contactModelRotationRef, contactModelTranslationRef)
-        contactModel = sobec.ContactModel6D(state, 
-                                                contactModelFrameId, 
-                                                contactModelPlacementRef, 
-                                                actuation.nu,
-                                                contactModelGains)     
-      else: logger.error("Unknown contactModelType. Please select in {1Dx, 1Dy, 1Dz, 3D, 6D}")
+    # 1D contact model = constraint an arbitrary translation (fixed position)
+    if('1D' in contactModelType):
+      if('x' in contactModelType):
+        referenceFrameRotation = pin.utils.rpyToMatrix(0, -np.pi/2, 0)
+      elif('y' in contactModelType):
+        referenceFrameRotation = pin.utils.rpyToMatrix(-np.pi/2, 0, 0)
+      elif('z' in contactModelType):
+        referenceFrameRotation = np.eye(3)
+    if('1D' in contactModelType):
+      contactModel = crocoddyl.ContactModel1D(state, 
+                                              contactModelFrameId, 
+                                              contactModelTranslationRef,
+                                              pinocchioReferenceFrame,
+                                              actuation.nu,
+                                              contactModelGains, 
+                                              referenceFrameRotation)  
+    # 3D contact model = constraint in x,y,z translations (fixed position)
+    elif(contactModelType == '3D'):
+      contactModel = crocoddyl.ContactModel3D(state, 
+                                              contactModelFrameId, 
+                                              contactModelTranslationRef,
+                                              pinocchioReferenceFrame,
+                                              actuation.nu, 
+                                              contactModelGains, 
+                                              referenceFrameRotation)  
+    # 6D contact model = constraint in x,y,z translations **and** rotations (fixed placement)
+    elif(contactModelType == '6D'):
+      contactModelPlacementRef = pin.SE3(contactModelRotationRef, contactModelTranslationRef)
+      contactModel = crocoddyl.ContactModel6D(state, 
+                                              contactModelFrameId, 
+                                              contactModelPlacementRef, 
+                                              pinocchioReferenceFrame,
+                                              actuation.nu,
+                                              contactModelGains, 
+                                              referenceFrameRotation)     
+    else: logger.error("Unknown contactModelType. Please select in {1Dx, 1Dy, 1Dz, 3D, 6D}")
     return contactModel
 
   def create_state_reg_cost(self, state, actuation):
@@ -381,70 +351,37 @@ class OptimalControlProblemAbstract:
       # Default force reference = zero force
       frameForceRef = pin.Force( np.asarray(self.frameForceRef) )
       frameForceWeights = np.asarray(self.frameForceWeights) 
-      if(FOUND_SOBEC):
-        frameForceCost = crocoddyl.CostModelResidual(state, 
-                                                    crocoddyl.ActivationModelWeightedQuad(frameForceWeights**2), 
-                                                    sobec.ResidualModelContactForce(state, 
-                                                                                        frameForceFrameId, 
-                                                                                        frameForceRef, 
-                                                                                        6, 
-                                                                                        actuation.nu))
-      else:
-        frameForceCost = crocoddyl.CostModelResidual(state, 
-                                                    crocoddyl.ActivationModelWeightedQuad(frameForceWeights**2), 
-                                                    crocoddyl.ResidualModelContactForce(state, 
-                                                                                        frameForceFrameId, 
-                                                                                        frameForceRef, 
-                                                                                        6, 
-                                                                                        actuation.nu))
+      frameForceCost = crocoddyl.CostModelResidual(state, 
+                                                  crocoddyl.ActivationModelWeightedQuad(frameForceWeights**2), 
+                                                  crocoddyl.ResidualModelContactForce(state, 
+                                                                                      frameForceFrameId, 
+                                                                                      frameForceRef, 
+                                                                                      6, 
+                                                                                      actuation.nu))
     # 3D contact case : linear force in (x,y,z) (LOCAL)
     if(ct_force_frame_type=='3D'):
       # Default force reference = zero force
       frameForceRef = pin.Force( np.asarray(self.frameForceRef) )
       frameForceWeights = np.asarray(self.frameForceWeights)[:3]
-      if(FOUND_SOBEC):
-        frameForceCost = crocoddyl.CostModelResidual(state, 
-                                                    crocoddyl.ActivationModelWeightedQuad(frameForceWeights**2), 
-                                                    sobec.ResidualModelContactForce(state, 
-                                                                                        frameForceFrameId, 
-                                                                                        frameForceRef, 
-                                                                                        3, 
-                                                                                        actuation.nu))
-      else:
-        frameForceCost = crocoddyl.CostModelResidual(state, 
-                                                    crocoddyl.ActivationModelWeightedQuad(frameForceWeights**2), 
-                                                    crocoddyl.ResidualModelContactForce(state, 
-                                                                                        frameForceFrameId, 
-                                                                                        frameForceRef, 
-                                                                                        3, 
-                                                                                        actuation.nu))
+      frameForceCost = crocoddyl.CostModelResidual(state, 
+                                                  crocoddyl.ActivationModelWeightedQuad(frameForceWeights**2), 
+                                                  crocoddyl.ResidualModelContactForce(state, 
+                                                                                      frameForceFrameId, 
+                                                                                      frameForceRef, 
+                                                                                      3, 
+                                                                                      actuation.nu))
     # 1D contact case : linear force along z (LOCAL)
     if('1D' in ct_force_frame_type):
-      if(FOUND_SOBEC):
-        if('x' in ct_force_frame_type): constrainedAxis = sobec.sobec_pywrap.Vector3MaskType.x
-        if('y' in ct_force_frame_type): constrainedAxis = sobec.sobec_pywrap.Vector3MaskType.y
-        if('z' in ct_force_frame_type): constrainedAxis = sobec.sobec_pywrap.Vector3MaskType.z
-        # Default force reference = zero force
-        frameForceRef = pin.Force( np.asarray(self.frameForceRef) )
-        frameForceWeights = np.asarray(self.frameForceWeights)[constrainedAxis:constrainedAxis+1]
-        frameForceCost = crocoddyl.CostModelResidual(state, 
-                                                    crocoddyl.ActivationModelWeightedQuad(frameForceWeights**2), 
-                                                    sobec.ResidualModelContactForce(state, 
-                                                                                        frameForceFrameId, 
-                                                                                        frameForceRef, 
-                                                                                        1, 
-                                                                                        actuation.nu))
-      else:
-        # Default force reference = zero force
-        frameForceRef = pin.Force( np.asarray(self.frameForceRef) )
-        frameForceWeights = np.asarray(self.frameForceWeights)[2:3]
-        frameForceCost = crocoddyl.CostModelResidual(state, 
-                                                    crocoddyl.ActivationModelWeightedQuad(frameForceWeights**2), 
-                                                    crocoddyl.ResidualModelContactForce(state, 
-                                                                                        frameForceFrameId, 
-                                                                                        frameForceRef, 
-                                                                                        1, 
-                                                                                        actuation.nu))
+      # Default force reference = zero force
+      frameForceRef = pin.Force( np.asarray(self.frameForceRef) )
+      frameForceWeights = np.asarray(self.frameForceWeights)[2:3]
+      frameForceCost = crocoddyl.CostModelResidual(state, 
+                                                  crocoddyl.ActivationModelWeightedQuad(frameForceWeights**2), 
+                                                  crocoddyl.ResidualModelContactForce(state, 
+                                                                                      frameForceFrameId, 
+                                                                                      frameForceRef, 
+                                                                                      1, 
+                                                                                      actuation.nu))
     return frameForceCost
 
   def create_friction_force_cost(self, state, actuation):
