@@ -106,14 +106,13 @@ class OptimalControlProblemAbstract:
         referenceFrameRotation = pin.utils.rpyToMatrix(-np.pi/2, 0, 0)
       elif('z' in contactModelType):
         referenceFrameRotation = np.eye(3)
-    if('1D' in contactModelType):
       contactModel = crocoddyl.ContactModel1D(state, 
                                               contactModelFrameId, 
-                                              contactModelTranslationRef,
+                                              contactModelTranslationRef[2],
                                               pinocchioReferenceFrame,
+                                              referenceFrameRotation,
                                               actuation.nu,
-                                              contactModelGains, 
-                                              referenceFrameRotation)  
+                                              contactModelGains)  
     # 3D contact model = constraint in x,y,z translations (fixed position)
     elif(contactModelType == '3D'):
       contactModel = crocoddyl.ContactModel3D(state, 
@@ -121,8 +120,7 @@ class OptimalControlProblemAbstract:
                                               contactModelTranslationRef,
                                               pinocchioReferenceFrame,
                                               actuation.nu, 
-                                              contactModelGains, 
-                                              referenceFrameRotation)  
+                                              contactModelGains)  
     # 6D contact model = constraint in x,y,z translations **and** rotations (fixed placement)
     elif(contactModelType == '6D'):
       contactModelPlacementRef = pin.SE3(contactModelRotationRef, contactModelTranslationRef)
@@ -131,8 +129,7 @@ class OptimalControlProblemAbstract:
                                               contactModelPlacementRef, 
                                               pinocchioReferenceFrame,
                                               actuation.nu,
-                                              contactModelGains, 
-                                              referenceFrameRotation)     
+                                              contactModelGains)     
     else: logger.error("Unknown contactModelType. Please select in {1Dx, 1Dy, 1Dz, 3D, 6D}")
     return contactModel
 
