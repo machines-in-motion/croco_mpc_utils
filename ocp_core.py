@@ -22,7 +22,7 @@ logger = CustomLogger(__name__, GLOBAL_LOG_LEVEL, GLOBAL_LOG_FORMAT).logger
 class OptimalControlProblemAbstract:
   '''
   Abstract class for Optimal Control Problem (OCP) with Crocoddyl
-    robot       : pinocchio robot wrapper
+    model       : pinocchio model
     config      : dict from YAML config file of OCP params
   '''
   def __init__(self, robot, config):

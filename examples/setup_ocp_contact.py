@@ -14,7 +14,7 @@ from croco_mpc_utils.ocp_data import OCPDataHandlerClassical
 import mim_solvers
 
 # Read YAML config file
-config = load_yaml_file('ocp.yml')
+config = load_yaml_file('ocp_contact.yml')
 
 # Import robot model (pinocchio wrapper)
 robot  = load_pinocchio_wrapper('iiwa')
@@ -36,7 +36,7 @@ solver.solve(xs_init, us_init, maxiter=100, isFeasible=False)
 
 # Plot the OCP solution using the OCP data helper class
 ocp_dh   = OCPDataHandlerClassical(ocp)
-ocp_data = ocp_dh.extract_data(solver.xs, solver.us)
+ocp_data = ocp_dh.extract_data(solver.xs, solver.us) #, config['frameTranslationFrameName'], config['frameTranslationFrameName'])
 
 ocp_dh.plot_ocp_results(ocp_data, markers=['.'], SHOW=True)
 

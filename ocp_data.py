@@ -29,8 +29,8 @@ class OCPDataHandlerClassical(OCPDataHandlerAbstract):
   def __init__(self, ocp):
     super().__init__(ocp)
 
-  def extract_data(self, xs, us, ee_frame_name, ct_frame_name):
-    return super().extract_data(xs, us, ee_frame_name, ct_frame_name)
+  def extract_data(self, xs, us): #, ee_frame_name, ct_frame_name):
+    return super().extract_data(xs, us) #, ee_frame_name, ct_frame_name)
 
   def plot_ocp_results(self, OCP_DATA, which_plots='all', labels=None, markers=None, colors=None, sampling_plot=1, SHOW=False):
       '''
@@ -120,9 +120,6 @@ class OCPDataHandlerClassical(OCPDataHandlerAbstract):
       nv = ocp_data['nv'] 
       # Extract trajectories
       x = np.array(ocp_data['xs'])
-      logger.debug("Dimensions of the reduced model : ")
-      logger.debug(str(nq))
-      logger.debug(str(nv))
       q = x[:,:nq]
       v = x[:,nq:nq+nv]
       # If state reg cost, 

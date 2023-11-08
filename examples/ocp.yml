@@ -28,14 +28,11 @@ frameTranslationWeights:  [1., 1., 1.]
 frameTranslationWeight: 2.
 frameTranslationWeightTerminal: 2. 
 frameTranslationRef: [-0.5, -0.5, 0.7]
-frameTranslationFrameName: 'contact' # 'DEFAULT' = $(frame_of_interest)
+frameTranslationFrameName: 'contact' 
 
  # 'velocity' : end-effector frame velocity (translation + rotation)
 frameVelocityWeights:  [1., 1., 1., 0., 0., 0.]
 frameVelocityWeight: 0.1
 frameVelocityWeightTerminal: 1
 frameVelocityRef: [0., 0., 0., 0., 0., 0.]    
-frameVelocityFrameName: 'contact' # 'DEFAULT' = $(frame_of_interest)
-
-# armature
-armature: [.1, .1, .1, .1, .1, .1, .0]
+frameVelocityFrameName: 'contact' 

@@ -67,8 +67,70 @@ class OCPDataHandlerAbstract:
     '''
     self.ocp = ocp
   
+  def find_cost_ids(self):
+    '''
+    Scans all residual models of every OCP nodes to find frame ids
+    '''
+    frameIds = []
+    for m in self.ocp.runningModels:
+      for cost_name in m.differential.costs.active_set:
+        residualModel = m.differential.costs.costs[cost_name].cost.residual
+        if(hasattr(residualModel, 'id')):
+            if(residualModel.id not in frameIds):
+              frameIds.append(residualModel.id)
+    logger.warning("Found "+str(len(frameIds))+" cost frame ids in the cost function !")
+    # TODO: enable multi-frames
+    if(len(frameIds) > 1):
+       logger.warning("Found "+str(len(frameIds))+" cost frame ids in the cost function !")
+       logger.warning(str(frameIds))
+       logger.warning("Only the first frame id "+str(frameIds[0])+" will be plotted")
+    if(len(frameIds) == 0):
+       logger.warning("Did not find any cost frame id.")
+    return frameIds[0]
+
+  def find_contact_ids(self):
+    '''
+    Scans all residual models of every OCP nodes to find contact frame names
+    '''
+    frameIds = []
+    for m in self.ocp.runningModels:
+      if(hasattr(m.differential, 'contacts')):
+        for ct_name in m.differential.contacts.contacts.todict().keys():
+          ct = m.differential.contacts.contacts[ct_name].contact
+          if(ct.id not in frameIds):
+              frameIds.append(ct.id)
+    logger.warning("Found "+str(len(frameIds))+" contact frame ids in the cost function !")
+    # TODO: enable multi-frames
+    if(len(frameIds) > 1):
+       logger.warning("Found "+str(len(frameIds))+" contact frame ids in the cost function !")
+       logger.warning(str(frameIds))
+       logger.warning("Only the first frame id "+str(frameIds[0])+" will be plotted")
+    if(len(frameIds) == 0):
+       logger.warning("Did not find any contact frame id.")
+    return frameIds[0]
+
+  def find_contact_names(self):
+    '''
+    Scans all residual models of every OCP nodes to find contact frame names
+    '''
+    ctNames = []
+    for m in self.ocp.runningModels:
+      if(hasattr(m.differential, 'contacts')):
+        for ct_name in m.differential.contacts.contacts.todict().keys():
+          if(ct_name not in ctNames):
+              ctNames.append(ct_name)
+    logger.warning("Found "+str(len(ctNames))+" contact names in the cost function !")
+    # TODO: enable multi-frames
+    if(len(ctNames) > 1):
+       logger.warning("Found "+str(len(ctNames))+" contact names in the cost function !")
+       logger.warning(str(ctNames))
+       logger.warning("Only the first contact name "+str(ctNames[0])+" will be plotted")
+    if(len(ctNames) == 0):
+       logger.warning("Did not find any contact name id.")
+    return ctNames[0]
+  
   # Data extraction : solution + contact + cost references
-  def extract_data(self, xs, us, ee_frame_name, ct_frame_name):
+  def extract_data(self, xs, us):
     '''
     Extract relevant plotting data from (X,U) solution of the OCP
     Args:
@@ -89,8 +151,8 @@ class OCPDataHandlerAbstract:
     ocp_data['dts'].append(self.ocp.terminalModel.dt)
     # Pin model
     ocp_data['pin_model'] = self.ocp.runningModels[0].differential.pinocchio
-    # ocp_data['armature'] = self.ocp.runningModels[0].differential.armature
-    ocp_data['frame_id'] = ocp_data['pin_model'].getFrameId(ee_frame_name)
+    # Look for the frames ids used in the cost function residual models
+    ocp_data['cost_frame_id']    = self.find_cost_ids()
     # Solution trajectories
     ocp_data['xs'] = xs
     ocp_data['us'] = us
@@ -98,6 +160,8 @@ class OCPDataHandlerAbstract:
     PIN_REF_FRAME =   pin.LOCAL
     # Extract force at EE frame and contact info
     if(hasattr(self.ocp.runningModels[0].differential, 'contacts')):
+      ocp_data['contact_frame_id'] = self.find_contact_ids()
+      ct_frame_name                = self.find_contact_names()
       # Get refs for contact model
       contactModelRef0 = self.ocp.runningModels[0].differential.contacts.contacts[ct_frame_name].contact.reference
       # Case 6D contact (x,y,z,Ox,Oy,Oz)
@@ -139,8 +203,8 @@ class OCPDataHandlerAbstract:
       ocp_data['fs'] = [ee_forces[i] for i in range(self.ocp.T)]
       # Express in WORLD aligned frame otherwise
       if(PIN_REF_FRAME == pin.LOCAL_WORLD_ALIGNED or PIN_REF_FRAME == pin.WORLD):
-        ct_frame_id = ocp_data['pin_model'].getFrameId(ct_frame_name)
-        Ms = [pin_utils.get_SE3_(ocp_data['xs'][i][:ocp_data['nq']], ocp_data['pin_model'], ct_frame_id) for i in range(self.ocp.T)]
+        # ct_frame_id = ocp_data['pin_model'].getFrameId(ct_frame_name)
+        Ms = [pin_utils.get_SE3_(ocp_data['xs'][i][:ocp_data['nq']], ocp_data['pin_model'], ocp_data['contact_frame_id']) for i in range(self.ocp.T)]
         ocp_data['fs'] = [Ms[i].action @ ee_forces[i] for i in range(self.ocp.T)]
     # Extract refs for active costs 
     # TODO : active costs may change along horizon : how to deal with that when plotting? 
@@ -173,7 +237,6 @@ class OCPDataHandlerAbstract:
     if('velocity' in ocp_data['active_costs']):
         ocp_data['velocity_ref'] = [self.ocp.runningModels[i].differential.costs.costs['velocity'].cost.residual.reference.vector for i in range(self.ocp.T)]
         ocp_data['velocity_ref'].append(self.ocp.terminalModel.differential.costs.costs['velocity'].cost.residual.reference.vector)
-        # ocp_data['frame_id'] = self.ocp.runningModels[0].differential.costs.costs['velocity'].cost.residual.id
     if('rotation' in ocp_data['active_costs']):
         ocp_data['rotation_ref'] = [self.ocp.runningModels[i].differential.costs.costs['rotation'].cost.residual.reference for i in range(self.ocp.T)]
         ocp_data['rotation_ref'].append(self.ocp.terminalModel.differential.costs.costs['rotation'].cost.residual.reference)
@@ -206,8 +269,8 @@ class OCPDataHandlerAbstract:
       x = np.array(ocp_data['xs'])
       q = x[:,:nq]
       v = x[:,nq:nq+nv]
-      lin_pos_ee = pin_utils.get_p_(q, ocp_data['pin_model'], ocp_data['frame_id'])
-      lin_vel_ee = pin_utils.get_v_(q, v, ocp_data['pin_model'], ocp_data['frame_id'])
+      lin_pos_ee = pin_utils.get_p_(q, ocp_data['pin_model'], ocp_data['cost_frame_id'])
+      lin_vel_ee = pin_utils.get_v_(q, v, ocp_data['pin_model'], ocp_data['cost_frame_id'])
       # Cost reference frame translation if any, or initial one
       if('translation' in ocp_data['active_costs'] or 'placement' in ocp_data['active_costs']):
           lin_pos_ee_ref = np.array(ocp_data['translation_ref'])
@@ -306,8 +369,8 @@ class OCPDataHandlerAbstract:
       x = np.array(ocp_data['xs'])
       q = x[:,:nq]
       v = x[:,nq:nq+nv]
-      rpy_ee = pin_utils.get_rpy_(q, ocp_data['pin_model'], ocp_data['frame_id'])
-      w_ee   = pin_utils.get_w_(q, v, ocp_data['pin_model'], ocp_data['frame_id'])
+      rpy_ee = pin_utils.get_rpy_(q, ocp_data['pin_model'], ocp_data['cost_frame_id'])
+      w_ee   = pin_utils.get_w_(q, v, ocp_data['pin_model'], ocp_data['cost_frame_id'])
       # Cost reference frame orientation if any, or initial one
       if('rotation' in ocp_data['active_costs'] or 'placement' in ocp_data['active_costs']):
           rpy_ee_ref = np.array([pin.utils.matrixToRpy(np.array(R)) for R in ocp_data['rotation_ref']])
