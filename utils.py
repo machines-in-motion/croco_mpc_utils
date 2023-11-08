@@ -1,4 +1,5 @@
 import logging
+import yaml
 
 # Global setting used by default in the whole package
 GLOBAL_LOG_LEVEL  = 'DEBUG'  # 'DEBUG'
@@ -75,3 +76,13 @@ class CustomLogger:
         else:
             print("Unknown logging format. Please choose 'LONG' or 'SHORT'. ")
         self.logger.addHandler(self.ch)
+
+
+# Load a yaml file (e.g. simu config file)
+def load_yaml_file(yaml_file):
+    '''
+    Load config file (yaml)
+    '''
+    with open(yaml_file) as f:
+        data = yaml.load(f, Loader=yaml.FullLoader)
+    return data 

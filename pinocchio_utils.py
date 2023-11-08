@@ -1,13 +1,18 @@
+"""
+@package croco_mpc_utils
+@file pinocchio_utils.py
+@author Sebastien Kleff
+@license License BSD-3-Clause
+@copyright Copyright (c) 2020, New York University and Max Planck Gesellschaft.
+@date 2023-10-18
+@brief Utilities to compute kinematic and dynamic quantities using Pinocchio
+"""
 
 import numpy as np
 import pinocchio as pin
 import eigenpy
 from numpy.linalg import pinv
 import time
-
-import pathlib
-import os
-os.sys.path.insert(1, str(pathlib.Path('.').absolute()))
 
 from croco_mpc_utils.utils import CustomLogger, GLOBAL_LOG_LEVEL, GLOBAL_LOG_FORMAT
 logger = CustomLogger(__name__, GLOBAL_LOG_LEVEL, GLOBAL_LOG_FORMAT).logger
@@ -235,16 +240,16 @@ def get_w_(q, dq, model, id_endeff, ref=pin.LOCAL):
 
 
 # Get frame force
-def get_f_(q, v, tau, model, id_endeff, armature, REG=0., ref=pin.LOCAL):
+def get_f_(q, v, tau, model, id_endeff, armature=None, REG=0.):
     '''
     Returns contact force in LOCAL frame based on FD estimate of joint acc
         q         : joint positions
         v         : joint velocities
-        a         : joint acceleration
         tau       : joint torques
-        pin_robot : Pinocchio wrapper
+        model     : pinocchio model
         id_endeff : id of EE frame
-        dt        : step size for FD estimate of joint acceleration
+        armature  : armature
+        REG       : reg for KKT inversion
     '''
     data = model.createData()
     if(len(q) != len(v) or len(q) != len(tau) or len(v) != len(tau)):
@@ -265,7 +270,8 @@ def get_f_(q, v, tau, model, id_endeff, armature, REG=0., ref=pin.LOCAL):
         J = pin.getFrameJacobian(model, data, id_endeff, pin.LOCAL) 
         # Joint space inertia and its inverse + NL terms
         pin.computeAllTerms(model, data, q[i,:], v[i,:])
-        data.M += np.diag(armature)
+        if(armature is not None):
+            data.M += np.diag(armature)
         Minv = np.linalg.inv(data.M)
         h = pin.nonLinearEffects(model, data, q[i,:], v[i,:])
         # Contact force
@@ -276,16 +282,16 @@ def get_f_(q, v, tau, model, id_endeff, armature, REG=0., ref=pin.LOCAL):
         # f[i,:] = np.linalg.solve( J @ Minv @ J.T + REGMAT,  J @ Minv @ (h - tau[i,:]) + gamma.vector )
     return f
 
-def get_f_lambda(q, v, tau, model, id_endeff, armature, REG=0.):
+def get_f_lambda(q, v, tau, model, id_endeff, armature=None, REG=0.):
     '''
     Returns contact force in LOCAL frame based on FD estimate of joint acc
         q         : joint positions
         v         : joint velocities
-        a         : joint acceleration
         tau       : joint torques
-        pin_robot : Pinocchio wrapper
+        model     : pinocchio model
         id_endeff : id of EE frame
-        dt        : step size for FD estimate of joint acceleration
+        armature  : armature
+        REG       : reg for KKT inversion
     '''
     data = model.createData()
     if(len(q) != len(v) or len(q) != len(tau) or len(v) != len(tau)):
@@ -308,7 +314,8 @@ def get_f_lambda(q, v, tau, model, id_endeff, armature, REG=0.):
         # gamma = pin.getFrameClassicalAcceleration(model, data, id_endeff, pin.ReferenceFrame.LOCAL)
         # Joint space inertia and its inverse + NL terms
         # pin.computeAllTerms(model, data, q[i,:], v[i,:])
-        data.M += np.diag(armature)
+        if(armature is not None):
+            data.M += np.diag(armature)
         pin.forwardDynamics(model, data, q[i,:], v[i,:], tau[i,:], J[:6,:], gamma.vector, REG)
         # Contact force
         f[i,:] = data.lambda_c
@@ -319,11 +326,9 @@ def get_f_kkt(q, v, tau, model, id_endeff):
     Returns contact force in LOCAL frame based on FD estimate of joint acc
         q         : joint positions
         v         : joint velocities
-        a         : joint acceleration
         tau       : joint torques
-        pin_robot : Pinocchio wrapper
+        model     : pinocchio model
         id_endeff : id of EE frame
-        dt        : step size for FD estimate of joint acceleration
     '''
     data = model.createData()
     if(len(q) != len(v) or len(q) != len(tau) or len(v) != len(tau)):
@@ -353,12 +358,13 @@ def get_f_kkt(q, v, tau, model, id_endeff):
 
 
 # Get gravity joint torque
-def get_u_grav(q, model, armature):
+def get_u_grav(q, model, armature=None):
     '''
     Return gravity torque at q
     '''
     data = model.createData()
-    data.M += np.diag(armature)
+    if(armature is not None):
+        data.M += np.diag(armature)
     return pin.computeGeneralizedGravity(model, data, q)
 
 
