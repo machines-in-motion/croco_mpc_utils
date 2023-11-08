@@ -44,7 +44,29 @@ class OptimalControlProblemClassicalWithConstraints(OptimalControlProblemClassic
     self.check_attribute('warm_start_y')
     self.check_attribute('reset_rho')
 
-  def create_differential_action_model(self, state, actuation):
+  def create_constraint_model_manager(self, state, actuation, node_id):
+    '''
+    Initialize a constraint model manager and adds constraints to it 
+    '''
+    constraintModelManager = crocoddyl.ConstraintModelManager(state, actuation.nu)
+    # State limits
+    if('stateBox' in self.WHICH_CONSTRAINTS and node_id != 0):
+      stateBoxConstraint = self.create_state_constraint(state, actuation)   
+      constraintModelManager.addConstraint('stateBox', stateBoxConstraint)
+    # Control limits
+    if('ctrlBox' in self.WHICH_CONSTRAINTS):
+      ctrlBoxConstraint = self.create_ctrl_constraint(state, actuation)
+      constraintModelManager.addConstraint('ctrlBox', ctrlBoxConstraint)
+    # End-effector position limits
+    if('translationBox' in self.WHICH_CONSTRAINTS and node_id != 0):
+      translationBoxConstraint = self.create_translation_constraint(state, actuation)
+      constraintModelManager.addConstraint('translationBox', translationBoxConstraint)
+    # Contact force 
+    if('forceBox' in self.WHICH_CONSTRAINTS and node_id != 0 and node_id != self.N_h):
+      forceBoxConstraint = self.create_force_constraint(state, actuation)
+      constraintModelManager.addConstraint('forceBox', forceBoxConstraint)
+
+  def create_differential_action_model(self, state, actuation, constraintModelManager):
     '''
     Initialize a differential action model with or without contacts, 
     and with explicit constraints
@@ -58,7 +80,7 @@ class OptimalControlProblemClassicalWithConstraints(OptimalControlProblemClassic
                                                                   actuation, 
                                                                   crocoddyl.ContactModelMultiple(state, actuation.nu), 
                                                                   crocoddyl.CostModelSum(state, nu=actuation.nu), 
-                                                                  crocoddyl.ConstraintModelManager(state, actuation.nu),
+                                                                  constraintModelManager,
                                                                   inv_damping=0., 
                                                                   enable_force=True)
     # Otherwise just create free DAM
@@ -66,54 +88,8 @@ class OptimalControlProblemClassicalWithConstraints(OptimalControlProblemClassic
       dam = crocoddyl.DifferentialActionModelFreeFwdDynamics(state, 
                                                               actuation, 
                                                               crocoddyl.CostModelSum(state, nu=actuation.nu),
-                                                              crocoddyl.ConstraintModelManager(state, actuation.nu))
+                                                              constraintModelManager)
     return dam, contactModels
-  
-  def init_constrained_running_model(self, state, actuation, runningModel, contactModels, node_id):
-    '''
-    Populate running model with costs, contacts and constraints
-    '''
-    # Add costs and contacts 
-    self.init_running_model(state, actuation, runningModel, contactModels)
-
-    # Add constraints
-    # State limits
-    if('stateBox' in self.WHICH_CONSTRAINTS and node_id != 0):
-      stateBoxConstraint = self.create_state_constraint(state, actuation)   
-      runningModel.differential.constraints.addConstraint('stateBox', stateBoxConstraint)
-    # Control limits
-    if('ctrlBox' in self.WHICH_CONSTRAINTS):
-      ctrlBoxConstraint = self.create_ctrl_constraint(state, actuation)
-      runningModel.differential.constraints.addConstraint('ctrlBox', ctrlBoxConstraint)
-    # End-effector position limits
-    if('translationBox' in self.WHICH_CONSTRAINTS and node_id != 0):
-      translationBoxConstraint = self.create_translation_constraint(state, actuation)
-      runningModel.differential.constraints.addConstraint('translationBox', translationBoxConstraint)
-    # Contact force 
-    if('forceBox' in self.WHICH_CONSTRAINTS and node_id != 0):
-      forceBoxConstraint = self.create_force_constraint(state, actuation)
-      runningModel.differential.constraints.addConstraint('forceBox', forceBoxConstraint)
-      
-  def init_constrained_terminal_model(self, state, actuation, terminalModel, contactModels):
-    ''' 
-    Populate terminal model with costs, contacts and constraints
-    '''
-    # Add costs and contacts 
-    self.init_terminal_model(state, actuation, terminalModel, contactModels)
-
-    # Add constraints
-    # State limits
-    if('stateBox' in self.WHICH_CONSTRAINTS):
-      stateBoxConstraint = self.create_state_constraint(state, actuation)   
-      terminalModel.differential.constraints.addConstraint('stateBox', stateBoxConstraint)
-    # Control limits
-    if('ctrlBox' in self.WHICH_CONSTRAINTS):
-      ctrlBoxConstraint = self.create_ctrl_constraint(state, actuation)
-      terminalModel.differential.constraints.addConstraint('ctrlBox', ctrlBoxConstraint)
-    # End-effector position limits
-    if('translationBox' in self.WHICH_CONSTRAINTS):
-      translationBoxConstraint = self.create_translation_constraint(state, actuation)
-      terminalModel.differential.constraints.addConstraint('translationBox', translationBoxConstraint)
 
   def success_log(self):
     '''
@@ -147,15 +123,18 @@ class OptimalControlProblemClassicalWithConstraints(OptimalControlProblemClassic
   # Create IAMs
     runningModels = []
     for i in range(self.N_h):  
+      # Create constraint manager and constraints
+        constraintModelManager = self.create_constraint_model_manager(state, actuation, i)
       # Create DAM (Contact or FreeFwd), IAM Euler and initialize costs+contacts+constraints
-        dam, contactModels = self.create_differential_action_model(state, actuation) 
+        dam, contactModels = self.create_differential_action_model(state, actuation, constraintModelManager) 
         runningModels.append(crocoddyl.IntegratedActionModelEuler(dam, stepTime=self.dt))
-        self.init_constrained_running_model(state, actuation, runningModels[i], contactModels, i)
+        self.init_running_model(state, actuation, runningModels[i], contactModels)
 
     # Terminal model
-    dam_t, contactModels = self.create_differential_action_model(state, actuation)  
+    constraintModelManager = self.create_constraint_model_manager(state, actuation, self.N_h)
+    dam_t, contactModels = self.create_differential_action_model(state, actuation, constraintModelManager)  
     terminalModel = crocoddyl.IntegratedActionModelEuler( dam_t, stepTime=0. )
-    self.init_constrained_terminal_model(state, actuation, terminalModel, contactModels)
+    self.init_terminal_model(state, actuation, terminalModel, contactModels)
     
     logger.info("Created IAMs.")  
 
