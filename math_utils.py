@@ -5,16 +5,11 @@
 @license License BSD-3-Clause
 @copyright Copyright (c) 2020, New York University and Max Planck Gesellschaft.
 @date 2023-10-18
-@brief Math utils e.g. trajectory generation
+@brief Utilities for basic reference trajectory & cost weight profile generation 
 """
 
 import numpy as np
-
 import pinocchio as pin
-
-import pathlib
-import os
-os.sys.path.insert(1, str(pathlib.Path('.').absolute()))
 
 from croco_mpc_utils.utils import CustomLogger, GLOBAL_LOG_LEVEL, GLOBAL_LOG_FORMAT
 logger = CustomLogger(__name__, GLOBAL_LOG_LEVEL, GLOBAL_LOG_FORMAT).logger

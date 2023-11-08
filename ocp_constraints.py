@@ -6,15 +6,11 @@
 @license License BSD-3-Clause
 @copyright Copyright (c) 2020, New York University and Max Planck Gesellschaft.
 @date 2023-10-18
-@brief Wrapper around Crocoddyl's API to initialize an OCP from a templated YAML config file
+@brief Wrapper around Crocoddyl's API to initialize an OCP from a templated YAML config file (with constraints)
 """
 
 
 import crocoddyl
-
-import pathlib
-import os
-os.sys.path.insert(1, str(pathlib.Path('.').absolute()))
 
 from croco_mpc_utils.ocp import OptimalControlProblemClassical
 

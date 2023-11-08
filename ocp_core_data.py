@@ -1,3 +1,13 @@
+"""
+@package croco_mpc_utils
+@file ocp_core_data.py
+@author Sebastien Kleff
+@license License BSD-3-Clause
+@copyright Copyright (c) 2020, New York University and Max Planck Gesellschaft.
+@date 2023-10-18
+@brief Data handlers for abstract OCP wrapper class
+"""
+
 import time
 import os
 
@@ -14,25 +24,29 @@ logger = CustomLogger(__name__, GLOBAL_LOG_LEVEL, GLOBAL_LOG_FORMAT).logger
 from croco_mpc_utils import pinocchio_utils as pin_utils
 
 
-# Save data (dict) into compressed npz
-def save_data(sim_data, save_name=None, save_dir=None):
+# Save simulation data (dictionary) into compressed *.npz
+def save_data(sim_data, save_dir, save_name=None):
     '''
     Saves data to a compressed npz file (binary)
+    Args:
+      sim_data  : object
+      save_dir  : save directory path
+      save_name : name of npz file 
     '''
     logger.info('Compressing & saving data...')
     if(save_name is None):
         save_name = 'sim_data_NO_NAME'+str(time.time())
-    if(save_dir is None):
-        save_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),'../data'))
     save_path = save_dir+'/'+save_name+'.npz'
     np.savez_compressed(save_path, data=sim_data)
     logger.info("Saved data to "+str(save_path)+" !")
 
 
-# Loads dict from compressed npz
+# Loads simulation data dictionary from compressed *.npz
 def load_data(npz_file):
     '''
     Loads a npz archive of sim_data into a dict
+    Args:
+      npz_file : path to *.npz
     '''
     logger.info('Loading data...')
     d = np.load(npz_file, allow_pickle=True)
@@ -41,168 +55,174 @@ def load_data(npz_file):
 
 
 # Abstract OCP data handler : extract data + generate fancy plots
-class DDPDataHandlerAbstract:
+class OCPDataHandlerAbstract:
   '''
-  Helper class to plot OCP results from Crocoddyl
-  note that results, state and control plots are pure virtual functions
+  Abstract helper class to plot Crocoddyl OCP results 
+  Plotting functions of results, state and control are purely virtual
   '''
-  def __init__(self, ddp):
-
-    self.ddp = ddp
+  def __init__(self, ocp):
+    '''
+    Args: 
+      ocp : crocoddyl.ShootingProblem 
+    '''
+    self.ocp = ocp
   
   # Data extraction : solution + contact + cost references
-  def extract_data(self, ee_frame_name, ct_frame_name):
+  def extract_data(self, xs, us, ee_frame_name, ct_frame_name):
     '''
-    extract data to plot
+    Extract relevant plotting data from (X,U) solution of the OCP
+    Args:
+      xs : nd array
+      us : nd array
     '''
-    logger.info("Extracting DDP data...")
+    logger.info("Extract OCP data...")
     # Store data
-    ddp_data = {}
+    ocp_data = {}
     # OCP params
-    ddp_data['T'] = self.ddp.problem.T
-    ddp_data['dt'] = self.ddp.problem.runningModels[0].dt
-    ddp_data['nq'] = self.ddp.problem.runningModels[0].state.nq
-    ddp_data['nv'] = self.ddp.problem.runningModels[0].state.nv
-    ddp_data['nu'] = self.ddp.problem.runningModels[0].differential.actuation.nu
-    ddp_data['nx'] = self.ddp.problem.runningModels[0].state.nx
-    ddp_data['dts'] = [self.ddp.problem.runningModels[i].dt for i in range(ddp_data['T'])]
-    ddp_data['dts'].append(self.ddp.problem.terminalModel.dt)
+    ocp_data['T'] = self.ocp.T
+    ocp_data['dt'] = self.ocp.runningModels[0].dt
+    ocp_data['nq'] = self.ocp.runningModels[0].state.nq
+    ocp_data['nv'] = self.ocp.runningModels[0].state.nv
+    ocp_data['nu'] = self.ocp.runningModels[0].differential.actuation.nu
+    ocp_data['nx'] = self.ocp.runningModels[0].state.nx
+    ocp_data['dts'] = [self.ocp.runningModels[i].dt for i in range(ocp_data['T'])]
+    ocp_data['dts'].append(self.ocp.terminalModel.dt)
     # Pin model
-    ddp_data['pin_model'] = self.ddp.problem.runningModels[0].differential.pinocchio
-    ddp_data['armature'] = self.ddp.problem.runningModels[0].differential.armature
-    ddp_data['frame_id'] = ddp_data['pin_model'].getFrameId(ee_frame_name)
+    ocp_data['pin_model'] = self.ocp.runningModels[0].differential.pinocchio
+    # ocp_data['armature'] = self.ocp.runningModels[0].differential.armature
+    ocp_data['frame_id'] = ocp_data['pin_model'].getFrameId(ee_frame_name)
     # Solution trajectories
-    ddp_data['xs'] = self.ddp.xs
-    ddp_data['us'] = self.ddp.us
-    ddp_data['CONTACT_TYPE'] = None
+    ocp_data['xs'] = xs
+    ocp_data['us'] = us
+    ocp_data['CONTACT_TYPE'] = None
     PIN_REF_FRAME =   pin.LOCAL
     # Extract force at EE frame and contact info
-    if(hasattr(self.ddp.problem.runningModels[0].differential, 'contacts')):
+    if(hasattr(self.ocp.runningModels[0].differential, 'contacts')):
       # Get refs for contact model
-      contactModelRef0 = self.ddp.problem.runningModels[0].differential.contacts.contacts[ct_frame_name].contact.reference
+      contactModelRef0 = self.ocp.runningModels[0].differential.contacts.contacts[ct_frame_name].contact.reference
       # Case 6D contact (x,y,z,Ox,Oy,Oz)
       if(hasattr(contactModelRef0, 'rotation')):
-        ddp_data['contact_rotation'] = [self.ddp.problem.runningModels[i].differential.contacts.contacts[ct_frame_name].contact.reference.rotation for i in range(self.ddp.problem.T)]
-        ddp_data['contact_rotation'].append(self.ddp.problem.terminalModel.differential.contacts.contacts[ct_frame_name].contact.reference.rotation)
-        ddp_data['contact_translation'] = [self.ddp.problem.runningModels[i].differential.contacts.contacts[ct_frame_name].contact.reference.translation for i in range(self.ddp.problem.T)]
-        ddp_data['contact_translation'].append(self.ddp.problem.terminalModel.differential.contacts.contacts[ct_frame_name].contact.reference.translation)
-        ddp_data['CONTACT_TYPE'] = '6D'
-        ddp_data['nc'] = 6
+        ocp_data['contact_rotation'] = [self.ocp.runningModels[i].differential.contacts.contacts[ct_frame_name].contact.reference.rotation for i in range(self.ocp.T)]
+        ocp_data['contact_rotation'].append(self.ocp.terminalModel.differential.contacts.contacts[ct_frame_name].contact.reference.rotation)
+        ocp_data['contact_translation'] = [self.ocp.runningModels[i].differential.contacts.contacts[ct_frame_name].contact.reference.translation for i in range(self.ocp.T)]
+        ocp_data['contact_translation'].append(self.ocp.terminalModel.differential.contacts.contacts[ct_frame_name].contact.reference.translation)
+        ocp_data['CONTACT_TYPE'] = '6D'
+        ocp_data['nc'] = 6
         PIN_REF_FRAME =   pin.LOCAL
       # Case 3D contact (x,y,z)
       elif(np.size(contactModelRef0)==3):
-        if(self.ddp.problem.runningModels[0].differential.contacts.contacts[ct_frame_name].contact.nc == 3):
+        if(self.ocp.runningModels[0].differential.contacts.contacts[ct_frame_name].contact.nc == 3):
           # Get ref translation for 3D 
-          ddp_data['contact_translation'] = [self.ddp.problem.runningModels[i].differential.contacts.contacts[ct_frame_name].contact.reference for i in range(self.ddp.problem.T)]
-          ddp_data['contact_translation'].append(self.ddp.problem.terminalModel.differential.contacts.contacts[ct_frame_name].contact.reference)
-          ddp_data['CONTACT_TYPE'] = '3D'
-          ddp_data['nc'] = 3
-        elif(self.ddp.problem.runningModels[0].differential.contacts.contacts[ct_frame_name].contact.nc == 1):
+          ocp_data['contact_translation'] = [self.ocp.runningModels[i].differential.contacts.contacts[ct_frame_name].contact.reference for i in range(self.ocp.T)]
+          ocp_data['contact_translation'].append(self.ocp.terminalModel.differential.contacts.contacts[ct_frame_name].contact.reference)
+          ocp_data['CONTACT_TYPE'] = '3D'
+          ocp_data['nc'] = 3
+        elif(self.ocp.runningModels[0].differential.contacts.contacts[ct_frame_name].contact.nc == 1):
           # Case 1D contact
-          ddp_data['contact_translation'] = [self.ddp.problem.runningModels[i].differential.contacts.contacts[ct_frame_name].contact.reference for i in range(self.ddp.problem.T)]
-          ddp_data['contact_translation'].append(self.ddp.problem.terminalModel.differential.contacts.contacts[ct_frame_name].contact.reference)
-          ddp_data['CONTACT_TYPE'] = '1D'
-          ddp_data['nc'] = 1
+          ocp_data['contact_translation'] = [self.ocp.runningModels[i].differential.contacts.contacts[ct_frame_name].contact.reference for i in range(self.ocp.T)]
+          ocp_data['contact_translation'].append(self.ocp.terminalModel.differential.contacts.contacts[ct_frame_name].contact.reference)
+          ocp_data['CONTACT_TYPE'] = '1D'
+          ocp_data['nc'] = 1
         else: 
-          print(self.ddp.problem.runningModels[0].differential.contacts.contacts[ct_frame_name].contact.nc == 3)
+          print(self.ocp.runningModels[0].differential.contacts.contacts[ct_frame_name].contact.nc == 3)
           logger.error("Contact must be 1D or 3D !")
         # Check which reference frame is used 
-        if(self.ddp.problem.runningModels[0].differential.contacts.contacts[ct_frame_name].contact.type == pin.pinocchio_pywrap.ReferenceFrame.LOCAL):
+        if(self.ocp.runningModels[0].differential.contacts.contacts[ct_frame_name].contact.type == pin.pinocchio_pywrap.ReferenceFrame.LOCAL):
           PIN_REF_FRAME = pin.LOCAL
         else:
           PIN_REF_FRAME = pin.LOCAL_WORLD_ALIGNED
       # Get contact force
-      datas = [self.ddp.problem.runningDatas[i].differential.multibody.contacts.contacts[ct_frame_name] for i in range(self.ddp.problem.T)]
+      datas = [self.ocp.runningDatas[i].differential.multibody.contacts.contacts[ct_frame_name] for i in range(self.ocp.T)]
       # data.f = force exerted at parent joint expressed in WORLD frame (oMi)
       # express it in LOCAL contact frame using jMf 
       ee_forces = [data.jMf.actInv(data.f).vector for data in datas] 
-      ddp_data['fs'] = [ee_forces[i] for i in range(self.ddp.problem.T)]
+      ocp_data['fs'] = [ee_forces[i] for i in range(self.ocp.T)]
       # Express in WORLD aligned frame otherwise
       if(PIN_REF_FRAME == pin.LOCAL_WORLD_ALIGNED or PIN_REF_FRAME == pin.WORLD):
-        ct_frame_id = ddp_data['pin_model'].getFrameId(ct_frame_name)
-        Ms = [pin_utils.get_SE3_(ddp_data['xs'][i][:ddp_data['nq']], ddp_data['pin_model'], ct_frame_id) for i in range(self.ddp.problem.T)]
-        ddp_data['fs'] = [Ms[i].action @ ee_forces[i] for i in range(self.ddp.problem.T)]
+        ct_frame_id = ocp_data['pin_model'].getFrameId(ct_frame_name)
+        Ms = [pin_utils.get_SE3_(ocp_data['xs'][i][:ocp_data['nq']], ocp_data['pin_model'], ct_frame_id) for i in range(self.ocp.T)]
+        ocp_data['fs'] = [Ms[i].action @ ee_forces[i] for i in range(self.ocp.T)]
     # Extract refs for active costs 
     # TODO : active costs may change along horizon : how to deal with that when plotting? 
-    ddp_data['active_costs'] = self.ddp.problem.runningModels[0].differential.costs.active_set
-    if('stateReg' in ddp_data['active_costs']):
-        ddp_data['stateReg_ref'] = [self.ddp.problem.runningModels[i].differential.costs.costs['stateReg'].cost.residual.reference for i in range(self.ddp.problem.T)]
-        ddp_data['stateReg_ref'].append(self.ddp.problem.terminalModel.differential.costs.costs['stateReg'].cost.residual.reference)
-    if('ctrlReg' in ddp_data['active_costs']):
-        ddp_data['ctrlReg_ref'] = [self.ddp.problem.runningModels[i].differential.costs.costs['ctrlReg'].cost.residual.reference for i in range(self.ddp.problem.T)]
-    if('ctrlRegGrav' in ddp_data['active_costs']):
-        ddp_data['ctrlRegGrav_ref'] = [pin_utils.get_u_grav(ddp_data['xs'][i][:ddp_data['nq']], ddp_data['pin_model'], ddp_data['armature']) for i in range(self.ddp.problem.T)]
-    if('stateLim' in ddp_data['active_costs']):
-        ddp_data['stateLim_ub'] = [self.ddp.problem.runningModels[i].differential.costs.costs['stateLim'].cost.activation.bounds.ub for i in range(self.ddp.problem.T)]
-        ddp_data['stateLim_lb'] = [self.ddp.problem.runningModels[i].differential.costs.costs['stateLim'].cost.activation.bounds.lb for i in range(self.ddp.problem.T)]
-        ddp_data['stateLim_ub'].append(self.ddp.problem.terminalModel.differential.costs.costs['stateLim'].cost.activation.bounds.ub)
-        ddp_data['stateLim_lb'].append(self.ddp.problem.terminalModel.differential.costs.costs['stateLim'].cost.activation.bounds.lb)
-    if('ctrlLim' in ddp_data['active_costs']):
-        ddp_data['ctrlLim_ub'] = [self.ddp.problem.runningModels[i].differential.costs.costs['ctrlLim'].cost.activation.bounds.ub for i in range(self.ddp.problem.T)]
-        ddp_data['ctrlLim_lb'] = [self.ddp.problem.runningModels[i].differential.costs.costs['ctrlLim'].cost.activation.bounds.lb for i in range(self.ddp.problem.T)]
-        ddp_data['ctrlLim_ub'].append(self.ddp.problem.runningModels[-1].differential.costs.costs['ctrlLim'].cost.activation.bounds.ub)
-        ddp_data['ctrlLim_lb'].append(self.ddp.problem.runningModels[-1].differential.costs.costs['ctrlLim'].cost.activation.bounds.lb)
-    if('placement' in ddp_data['active_costs']):
-        ddp_data['translation_ref'] = [self.ddp.problem.runningModels[i].differential.costs.costs['placement'].cost.residual.reference.translation for i in range(self.ddp.problem.T)]
-        ddp_data['translation_ref'].append(self.ddp.problem.terminalModel.differential.costs.costs['placement'].cost.residual.reference.translation)
-        ddp_data['rotation_ref'] = [self.ddp.problem.runningModels[i].differential.costs.costs['placement'].cost.residual.reference.rotation for i in range(self.ddp.problem.T)]
-        ddp_data['rotation_ref'].append(self.ddp.problem.terminalModel.differential.costs.costs['placement'].cost.residual.reference.rotation)
-    if('translation' in ddp_data['active_costs']):
-        ddp_data['translation_ref'] = [self.ddp.problem.runningModels[i].differential.costs.costs['translation'].cost.residual.reference for i in range(self.ddp.problem.T)]
-        ddp_data['translation_ref'].append(self.ddp.problem.terminalModel.differential.costs.costs['translation'].cost.residual.reference)
-    if('velocity' in ddp_data['active_costs']):
-        ddp_data['velocity_ref'] = [self.ddp.problem.runningModels[i].differential.costs.costs['velocity'].cost.residual.reference.vector for i in range(self.ddp.problem.T)]
-        ddp_data['velocity_ref'].append(self.ddp.problem.terminalModel.differential.costs.costs['velocity'].cost.residual.reference.vector)
-        # ddp_data['frame_id'] = self.ddp.problem.runningModels[0].differential.costs.costs['velocity'].cost.residual.id
-    if('rotation' in ddp_data['active_costs']):
-        ddp_data['rotation_ref'] = [self.ddp.problem.runningModels[i].differential.costs.costs['rotation'].cost.residual.reference for i in range(self.ddp.problem.T)]
-        ddp_data['rotation_ref'].append(self.ddp.problem.terminalModel.differential.costs.costs['rotation'].cost.residual.reference)
-    if('force' in ddp_data['active_costs']): 
-        ddp_data['force_ref'] = [self.ddp.problem.runningModels[i].differential.costs.costs['force'].cost.residual.reference.vector for i in range(self.ddp.problem.T)]
-    return ddp_data
+    ocp_data['active_costs'] = self.ocp.runningModels[0].differential.costs.active_set
+    if('stateReg' in ocp_data['active_costs']):
+        ocp_data['stateReg_ref'] = [self.ocp.runningModels[i].differential.costs.costs['stateReg'].cost.residual.reference for i in range(self.ocp.T)]
+        ocp_data['stateReg_ref'].append(self.ocp.terminalModel.differential.costs.costs['stateReg'].cost.residual.reference)
+    if('ctrlReg' in ocp_data['active_costs']):
+        ocp_data['ctrlReg_ref'] = [self.ocp.runningModels[i].differential.costs.costs['ctrlReg'].cost.residual.reference for i in range(self.ocp.T)]
+    if('ctrlRegGrav' in ocp_data['active_costs']):
+        ocp_data['ctrlRegGrav_ref'] = [pin_utils.get_u_grav(ocp_data['xs'][i][:ocp_data['nq']], ocp_data['pin_model']) for i in range(self.ocp.T)]
+    if('stateLim' in ocp_data['active_costs']):
+        ocp_data['stateLim_ub'] = [self.ocp.runningModels[i].differential.costs.costs['stateLim'].cost.activation.bounds.ub for i in range(self.ocp.T)]
+        ocp_data['stateLim_lb'] = [self.ocp.runningModels[i].differential.costs.costs['stateLim'].cost.activation.bounds.lb for i in range(self.ocp.T)]
+        ocp_data['stateLim_ub'].append(self.ocp.terminalModel.differential.costs.costs['stateLim'].cost.activation.bounds.ub)
+        ocp_data['stateLim_lb'].append(self.ocp.terminalModel.differential.costs.costs['stateLim'].cost.activation.bounds.lb)
+    if('ctrlLim' in ocp_data['active_costs']):
+        ocp_data['ctrlLim_ub'] = [self.ocp.runningModels[i].differential.costs.costs['ctrlLim'].cost.activation.bounds.ub for i in range(self.ocp.T)]
+        ocp_data['ctrlLim_lb'] = [self.ocp.runningModels[i].differential.costs.costs['ctrlLim'].cost.activation.bounds.lb for i in range(self.ocp.T)]
+        ocp_data['ctrlLim_ub'].append(self.ocp.runningModels[-1].differential.costs.costs['ctrlLim'].cost.activation.bounds.ub)
+        ocp_data['ctrlLim_lb'].append(self.ocp.runningModels[-1].differential.costs.costs['ctrlLim'].cost.activation.bounds.lb)
+    if('placement' in ocp_data['active_costs']):
+        ocp_data['translation_ref'] = [self.ocp.runningModels[i].differential.costs.costs['placement'].cost.residual.reference.translation for i in range(self.ocp.T)]
+        ocp_data['translation_ref'].append(self.ocp.terminalModel.differential.costs.costs['placement'].cost.residual.reference.translation)
+        ocp_data['rotation_ref'] = [self.ocp.runningModels[i].differential.costs.costs['placement'].cost.residual.reference.rotation for i in range(self.ocp.T)]
+        ocp_data['rotation_ref'].append(self.ocp.terminalModel.differential.costs.costs['placement'].cost.residual.reference.rotation)
+    if('translation' in ocp_data['active_costs']):
+        ocp_data['translation_ref'] = [self.ocp.runningModels[i].differential.costs.costs['translation'].cost.residual.reference for i in range(self.ocp.T)]
+        ocp_data['translation_ref'].append(self.ocp.terminalModel.differential.costs.costs['translation'].cost.residual.reference)
+    if('velocity' in ocp_data['active_costs']):
+        ocp_data['velocity_ref'] = [self.ocp.runningModels[i].differential.costs.costs['velocity'].cost.residual.reference.vector for i in range(self.ocp.T)]
+        ocp_data['velocity_ref'].append(self.ocp.terminalModel.differential.costs.costs['velocity'].cost.residual.reference.vector)
+        # ocp_data['frame_id'] = self.ocp.runningModels[0].differential.costs.costs['velocity'].cost.residual.id
+    if('rotation' in ocp_data['active_costs']):
+        ocp_data['rotation_ref'] = [self.ocp.runningModels[i].differential.costs.costs['rotation'].cost.residual.reference for i in range(self.ocp.T)]
+        ocp_data['rotation_ref'].append(self.ocp.terminalModel.differential.costs.costs['rotation'].cost.residual.reference)
+    if('force' in ocp_data['active_costs']): 
+        ocp_data['force_ref'] = [self.ocp.runningModels[i].differential.costs.costs['force'].cost.residual.reference.vector for i in range(self.ocp.T)]
+    return ocp_data
   
   # Virtual plotting functions
-  def plot_ddp_results(self):
+  def plot_ocp_results(self):
       raise NotImplementedError()
 
-  def plot_ddp_state(self):
+  def plot_ocp_state(self):
       raise NotImplementedError()
 
-  def plot_ddp_control(self):
+  def plot_ocp_control(self):
       raise NotImplementedError()
 
   # Base plotting functions
-  def plot_ddp_endeff_linear(self, ddp_data, fig=None, ax=None, label=None, marker=None, color=None, alpha=1., 
+  def plot_ocp_endeff_linear(self, ocp_data, fig=None, ax=None, label=None, marker=None, color=None, alpha=1., 
                                                       MAKE_LEGEND=False, SHOW=True, AUTOSCALE=False):
       '''
-      Plot ddp results (endeff linear position, velocity)
+      Plot OCP results (end-effector linear position, velocity)
       '''
       # Parameters
-      N = ddp_data['T'] 
-      dt = ddp_data['dt']
-      nq = ddp_data['nq']
-      nv = ddp_data['nv'] 
+      N = ocp_data['T'] 
+      dt = ocp_data['dt']
+      nq = ocp_data['nq']
+      nv = ocp_data['nv'] 
       # Extract EE traj
-      x = np.array(ddp_data['xs'])
+      x = np.array(ocp_data['xs'])
       q = x[:,:nq]
       v = x[:,nq:nq+nv]
-      lin_pos_ee = pin_utils.get_p_(q, ddp_data['pin_model'], ddp_data['frame_id'])
-      lin_vel_ee = pin_utils.get_v_(q, v, ddp_data['pin_model'], ddp_data['frame_id'])
+      lin_pos_ee = pin_utils.get_p_(q, ocp_data['pin_model'], ocp_data['frame_id'])
+      lin_vel_ee = pin_utils.get_v_(q, v, ocp_data['pin_model'], ocp_data['frame_id'])
       # Cost reference frame translation if any, or initial one
-      if('translation' in ddp_data['active_costs'] or 'placement' in ddp_data['active_costs']):
-          lin_pos_ee_ref = np.array(ddp_data['translation_ref'])
+      if('translation' in ocp_data['active_costs'] or 'placement' in ocp_data['active_costs']):
+          lin_pos_ee_ref = np.array(ocp_data['translation_ref'])
       else:
           lin_pos_ee_ref = np.array([lin_pos_ee[0,:] for i in range(N+1)])
       # Cost reference frame linear velocity if any, or initial one
-      if('velocity' in ddp_data['active_costs']):
-          lin_vel_ee_ref = np.array(ddp_data['velocity_ref'])[:,:3] # linear part
+      if('velocity' in ocp_data['active_costs']):
+          lin_vel_ee_ref = np.array(ocp_data['velocity_ref'])[:,:3] # linear part
       else:
           lin_vel_ee_ref = np.array([lin_vel_ee[0,:] for i in range(N+1)])
       # Contact reference translation if CONTACT
-      if(ddp_data['CONTACT_TYPE'] is not None):
-          lin_pos_ee_contact = np.array(ddp_data['contact_translation'])
+      if(ocp_data['CONTACT_TYPE'] is not None):
+          lin_pos_ee_contact = np.array(ocp_data['contact_translation'])
       # Plots
-      tspan = np.array([sum(ddp_data['dts'][:i]) for i in range(len(ddp_data['dts']))]) #np.linspace(0, N*sum(ddp_data['dts']), N+1)
+      tspan = np.array([sum(ocp_data['dts'][:i]) for i in range(len(ocp_data['dts']))]) #np.linspace(0, N*sum(ocp_data['dts']), N+1)
       if(ax is None or fig is None):
           fig, ax = plt.subplots(3, 2, sharex='col')
       if(label is None):
@@ -212,7 +232,7 @@ class DDPDataHandlerAbstract:
           # Plot EE position in WORLD frame
           ax[i,0].plot(tspan, lin_pos_ee[:,i], linestyle='-', marker=marker, label=label, color=color, alpha=alpha)
           # Plot EE target frame translation in WORLD frame
-          if('translation' or 'placement' in ddp_data['active_costs']):
+          if('translation' or 'placement' in ocp_data['active_costs']):
               handles, labels = ax[i,0].get_legend_handles_labels()
               if('reference' in labels):
                   handles.pop(labels.index('reference'))
@@ -220,7 +240,7 @@ class DDPDataHandlerAbstract:
                   labels.remove('reference')
               ax[i,0].plot(tspan, lin_pos_ee_ref[:,i], linestyle='--', color='k', marker=None, label='reference', alpha=0.5)
           # Plot CONTACT reference frame translation in WORLD frame
-          if(ddp_data['CONTACT_TYPE'] is not None):
+          if(ocp_data['CONTACT_TYPE'] is not None):
               handles, labels = ax[i,0].get_legend_handles_labels()
               if('Baumgarte stab. ref.' in labels):
                   handles.pop(labels.index('Baumgarte stab. ref.'))
@@ -236,7 +256,7 @@ class DDPDataHandlerAbstract:
           # Plot EE (linear) velocities in WORLD frame
           ax[i,1].plot(tspan, lin_vel_ee[:,i], linestyle='-', marker=marker, label=label, color=color, alpha=alpha)
           # Plot EE target frame (linear) velocity in WORLD frame
-          if('velocity' in ddp_data['active_costs']):
+          if('velocity' in ocp_data['active_costs']):
               handles, labels = ax[i,1].get_legend_handles_labels()
               if('reference' in labels):
                   handles.pop(labels.index('reference'))
@@ -272,37 +292,37 @@ class DDPDataHandlerAbstract:
           plt.show()
       return fig, ax
 
-  def plot_ddp_endeff_angular(self, ddp_data, fig=None, ax=None, label=None, marker=None, color=None, alpha=1., 
+  def plot_ocp_endeff_angular(self, ocp_data, fig=None, ax=None, label=None, marker=None, color=None, alpha=1., 
                                                       MAKE_LEGEND=False, SHOW=True, AUTOSCALE=False):
       '''
-      Plot ddp results (endeff angular position, velocity)
+      Plot OCP results (endeff angular position, velocity)
       '''
       # Parameters
-      N = ddp_data['T'] 
-      dt = ddp_data['dt']
-      nq = ddp_data['nq']
-      nv = ddp_data['nv'] 
+      N = ocp_data['T'] 
+      dt = ocp_data['dt']
+      nq = ocp_data['nq']
+      nv = ocp_data['nv'] 
       # Extract EE traj
-      x = np.array(ddp_data['xs'])
+      x = np.array(ocp_data['xs'])
       q = x[:,:nq]
       v = x[:,nq:nq+nv]
-      rpy_ee = pin_utils.get_rpy_(q, ddp_data['pin_model'], ddp_data['frame_id'])
-      w_ee   = pin_utils.get_w_(q, v, ddp_data['pin_model'], ddp_data['frame_id'])
+      rpy_ee = pin_utils.get_rpy_(q, ocp_data['pin_model'], ocp_data['frame_id'])
+      w_ee   = pin_utils.get_w_(q, v, ocp_data['pin_model'], ocp_data['frame_id'])
       # Cost reference frame orientation if any, or initial one
-      if('rotation' in ddp_data['active_costs'] or 'placement' in ddp_data['active_costs']):
-          rpy_ee_ref = np.array([pin.utils.matrixToRpy(np.array(R)) for R in ddp_data['rotation_ref']])
+      if('rotation' in ocp_data['active_costs'] or 'placement' in ocp_data['active_costs']):
+          rpy_ee_ref = np.array([pin.utils.matrixToRpy(np.array(R)) for R in ocp_data['rotation_ref']])
       else:
           rpy_ee_ref = np.array([rpy_ee[0,:] for i in range(N+1)])
       # Cost reference angular velocity if any, or initial one
-      if('velocity' in ddp_data['active_costs']):
-          w_ee_ref = np.array(ddp_data['velocity_ref'])[:,3:] # angular part
+      if('velocity' in ocp_data['active_costs']):
+          w_ee_ref = np.array(ocp_data['velocity_ref'])[:,3:] # angular part
       else:
           w_ee_ref = np.array([w_ee[0,:] for i in range(N+1)])
       # Contact reference orientation (6D)
-      if(ddp_data['CONTACT_TYPE']=='6D'):
-          rpy_ee_contact = np.array([pin.utils.matrixToRpy(R) for R in ddp_data['contact_rotation']])
+      if(ocp_data['CONTACT_TYPE']=='6D'):
+          rpy_ee_contact = np.array([pin.utils.matrixToRpy(R) for R in ocp_data['contact_rotation']])
       # Plots
-      tspan = np.array([sum(ddp_data['dts'][:i]) for i in range(len(ddp_data['dts']))]) #np.linspace(0, N*sum(ddp_data['dts']), N+1)
+      tspan = np.array([sum(ocp_data['dts'][:i]) for i in range(len(ocp_data['dts']))]) #np.linspace(0, N*sum(ocp_data['dts']), N+1)
       if(ax is None or fig is None):
           fig, ax = plt.subplots(3, 2, sharex='col')
       if(label is None):
@@ -313,7 +333,7 @@ class DDPDataHandlerAbstract:
           ax[i,0].plot(tspan, rpy_ee[:,i], linestyle='-', marker=marker, label=label, color=color, alpha=alpha)
 
           # Plot EE target frame orientation in WORLD frame
-          if('rotation' or 'placement' in ddp_data['active_costs']):
+          if('rotation' or 'placement' in ocp_data['active_costs']):
               handles, labels = ax[i,0].get_legend_handles_labels()
               if('reference' in labels):
                   handles.pop(labels.index('reference'))
@@ -322,7 +342,7 @@ class DDPDataHandlerAbstract:
               ax[i,0].plot(tspan, rpy_ee_ref[:,i], linestyle='--', color='k', marker=None, label='reference', alpha=0.5)
           
           # Plot CONTACT reference frame rotation in WORLD frame
-          if(ddp_data['CONTACT_TYPE']=='6D'):
+          if(ocp_data['CONTACT_TYPE']=='6D'):
               handles, labels = ax[i,0].get_legend_handles_labels()
               if('contact' in labels):
                   handles.pop(labels.index('contact'))
@@ -340,7 +360,7 @@ class DDPDataHandlerAbstract:
           ax[i,1].plot(tspan, w_ee[:,i], linestyle='-', marker=marker, label=label, color=color, alpha=alpha)
 
           # Plot EE target frame (linear) velocity in WORLD frame
-          if('velocity' in ddp_data['active_costs']):
+          if('velocity' in ocp_data['active_costs']):
               handles, labels = ax[i,1].get_legend_handles_labels()
               if('reference' in labels):
                   handles.pop(labels.index('reference'))
@@ -377,27 +397,27 @@ class DDPDataHandlerAbstract:
           plt.show()
       return fig, ax
 
-  def plot_ddp_force(self, ddp_data, fig=None, ax=None, label=None, marker=None, color=None, alpha=1., 
+  def plot_ocp_force(self, ocp_data, fig=None, ax=None, label=None, marker=None, color=None, alpha=1., 
                                                   MAKE_LEGEND=False, SHOW=True, AUTOSCALE=False):
       '''
-      Plot ddp results (force)
+      Plot OCP results (force)
       '''
       # Parameters
-      N = ddp_data['T'] 
-      dt = ddp_data['dt']
+      N = ocp_data['T'] 
+      dt = ocp_data['dt']
       # Extract EE traj
-      f = np.array(ddp_data['fs'])
+      f = np.array(ocp_data['fs'])
       f_ee_lin = f[:,:3]
       f_ee_ang = f[:,3:]
       # Get desired contact wrench (linear, angular)
-      if('force_ref' in ddp_data.keys()):
-          f_ee_ref = np.array(ddp_data['force_ref'])
+      if('force_ref' in ocp_data.keys()):
+          f_ee_ref = np.array(ocp_data['force_ref'])
       else:
           f_ee_ref = np.zeros((N,6))
       f_ee_lin_ref = f_ee_ref[:,:3]
       f_ee_ang_ref = f_ee_ref[:,3:]
       # Plots
-      tspan = np.array([sum(ddp_data['dts'][:i]) for i in range(len(ddp_data['dts'])-1)]) #)] np.linspace(0, N*sum(ddp_data['dts']), N)
+      tspan = np.array([sum(ocp_data['dts'][:i]) for i in range(len(ocp_data['dts'])-1)]) #)] np.linspace(0, N*sum(ocp_data['dts']), N)
       if(ax is None or fig is None):
           fig, ax = plt.subplots(3, 2, sharex='col')
       if(label is None):
@@ -408,7 +428,7 @@ class DDPDataHandlerAbstract:
           ax[i,0].plot(tspan, f_ee_lin[:,i], linestyle='-', marker=marker, label=label, color=color, alpha=alpha)
 
           # Plot desired contact linear wrench (force) in LOCAL frame 
-          if('force_ref' in ddp_data.keys()):
+          if('force_ref' in ocp_data.keys()):
               handles, labels = ax[i,0].get_legend_handles_labels()
               if('reference' in labels):
                   handles.pop(labels.index('reference'))
@@ -426,7 +446,7 @@ class DDPDataHandlerAbstract:
           ax[i,1].plot(tspan, f_ee_ang[:,i], linestyle='-', marker=marker, label=label, color=color, alpha=alpha)
 
           # Plot desired contact anguler wrench (torque) in LOCAL frame
-          if('force_ref' in ddp_data.keys()):
+          if('force_ref' in ocp_data.keys()):
               handles, labels = ax[i,1].get_legend_handles_labels()
               if('reference' in labels):
                   handles.pop(labels.index('reference'))
@@ -469,7 +489,7 @@ class DDPDataHandlerAbstract:
 # Abstract MPC data handler : initialize, extract data + generate fancy plots
 class MPCDataHandlerAbstract:
   '''
-  Helper class to manage data in MPC simulations
+  Helper class to manage and plot data from MPC simulations
   '''
 
   def __init__(self, config, robot):
@@ -588,7 +608,7 @@ class MPCDataHandlerAbstract:
 
   def init_solver_data(self):
     '''
-    Allocate data for DDP solver stuff (useful to debug)
+    Allocate data for OCP solver stuff (useful to debug)
     '''
     self.K      = np.zeros((self.N_plan, self.N_h, self.nq, self.nx))     # Ricatti gains (K_0)
     self.Vxx    = np.zeros((self.N_plan, self.N_h+1, self.nx, self.nx)) # Hessian of the Value Function  
@@ -673,32 +693,32 @@ class MPCDataHandlerAbstract:
     raise NotImplementedError()
 
 
-  def record_solver_data(self, nb_plan, ddpSolver):
+  def record_solver_data(self, nb_plan, ocpSolver):
     '''
     Handy function to record solver related data during MPC simulation
     '''
     if(self.RECORD_SOLVER_DATA):
-      self.K[nb_plan, :, :, :]   = np.array(ddpSolver.K)         # Ricatti gains
-      self.Vxx[nb_plan, :, :, :] = np.array(ddpSolver.Vxx)       # Hessians of V.F. 
-      self.Quu[nb_plan, :, :, :] = np.array(ddpSolver.Quu)       # Hessians of Q 
-      self.xreg[nb_plan]         = ddpSolver.x_reg               # Reg solver on x
-      self.ureg[nb_plan]         = ddpSolver.u_reg               # Reg solver on u
-      self.J_rank[nb_plan]       = np.linalg.matrix_rank(ddpSolver.problem.runningDatas[0].differential.pinocchio.J)
+      self.K[nb_plan, :, :, :]   = np.array(ocpSolver.K)         # Ricatti gains
+      self.Vxx[nb_plan, :, :, :] = np.array(ocpSolver.Vxx)       # Hessians of V.F. 
+      self.Quu[nb_plan, :, :, :] = np.array(ocpSolver.Quu)       # Hessians of Q 
+      self.xreg[nb_plan]         = ocpSolver.x_reg               # Reg solver on x
+      self.ureg[nb_plan]         = ocpSolver.u_reg               # Reg solver on u
+      self.J_rank[nb_plan]       = np.linalg.matrix_rank(ocpSolver.problem.runningDatas[0].differential.pinocchio.J)
 
-  def record_cost_references(self, nb_plan, ddpSolver):
+  def record_cost_references(self, nb_plan, ocpSolver):
     '''
     Handy function for MPC + clean plots
     Extract and record cost references of DAM into sim_data at i^th simulation step
      # careful, ref is hard-coded only for the first node
     '''
     # Get nodes
-    m = ddpSolver.problem.runningModels[0]
+    m = ocpSolver.problem.runningModels[0]
     # Extract references and record
     if('ctrlReg' in self.WHICH_COSTS):
       self.ctrl_ref[nb_plan, :] = m.differential.costs.costs['ctrlReg'].cost.residual.reference
     if('ctrlRegGrav' in self.WHICH_COSTS):
       q = self.state_pred[nb_plan, 0, :self.nq]
-      self.ctrl_ref[nb_plan, :] = pin_utils.get_u_grav(q, m.differential.pinocchio, self.armature)
+      self.ctrl_ref[nb_plan, :] = pin_utils.get_u_grav(q, m.differential.pinocchio) #, self.armature)
     if('force' in self.WHICH_COSTS):
       if('force' in m.differential.costs.costs.todict().keys()):  
         self.f_ee_ref[nb_plan, :] = m.differential.costs.costs['force'].cost.residual.reference.vector
@@ -1309,7 +1329,7 @@ class MPCDataHandlerAbstract:
       ax_S[1].grid(True)
 
       # Titles
-      fig_S.suptitle('FDDP solver regularization on x (Vxx diag) and u (Quu diag)', size=16)
+      fig_S.suptitle('OCP solver regularization on x (Vxx diag) and u (Quu diag)', size=16)
       # Save figs
       if(SAVE):
           figs = {'S': fig_S}

@@ -5,7 +5,7 @@
 @license License BSD-3-Clause
 @copyright Copyright (c) 2020, New York University and Max Planck Gesellschaft.
 @date 2023-10-18
-@brief Wrapper around Crocoddyl's API to initialize an OCP from a templated YAML config file
+@brief Abstract wrapper around Crocoddyl's API to initialize an OCP from a templated YAML config file
 """
 
 import numpy as np
@@ -13,10 +13,6 @@ import numpy as np
 import crocoddyl
 import pinocchio as pin
 import hppfcl
-
-import pathlib
-import os
-os.sys.path.insert(1, str(pathlib.Path('.').absolute()))
 
 from croco_mpc_utils.utils import CustomLogger, GLOBAL_LOG_LEVEL, GLOBAL_LOG_FORMAT
 logger = CustomLogger(__name__, GLOBAL_LOG_LEVEL, GLOBAL_LOG_FORMAT).logger
@@ -58,7 +54,7 @@ class OptimalControlProblemAbstract:
     self.check_attribute('q0')
     self.check_attribute('dq0')
     self.check_attribute('WHICH_COSTS')
-    self.check_attribute('armature')
+    # self.check_attribute('armature')
 
   def create_contact_model(self, contact_config, state, actuation):
     '''

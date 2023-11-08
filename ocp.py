@@ -124,8 +124,8 @@ class OptimalControlProblemClassical(OptimalControlProblemAbstract):
       collisionCost = self.create_collision_cost(state, actuation)
       runningModel.differential.costs.addCost("collision", collisionCost, self.collisionCostWeight)
 
-    # Armature 
-    runningModel.differential.armature = np.asarray(self.armature)
+    # # Armature 
+    # runningModel.differential.armature = np.asarray(self.armature)
     
     # Contact model
     if(len(contactModels) > 0):
@@ -165,8 +165,8 @@ class OptimalControlProblemClassical(OptimalControlProblemAbstract):
       collisionCost = self.create_collision_cost(state, actuation)
       terminalModel.differential.costs.addCost("collision", collisionCost, self.collisionCostWeightTerminal*self.dt)
 
-    # Add armature
-    terminalModel.differential.armature = np.asarray(self.armature)   
+    # # Add armature
+    # terminalModel.differential.armature = np.asarray(self.armature)   
   
     # Add contact model
     if(len(contactModels)):
