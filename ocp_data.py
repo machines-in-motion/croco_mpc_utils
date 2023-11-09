@@ -341,10 +341,10 @@ class MPCDataHandlerClassical(MPCDataHandlerAbstract):
         lwaMf = pin.SE3(self.rdata.oMf[id_endeff].rotation, np.zeros(3))
         if(self.PIN_REF_FRAME == pin.LOCAL):
             self.force_pred[nb_plan, :, :] = \
-                np.array([jMf.actInv(ocpSolver.problem.runningDatas[i].differential.multibody.contacts.contacts[self.contactFrameName].f).vector for i in range(self.N_h)])
+                np.array([jMf.actInv(ocpSolver.problem.runningDatas[i].differential.multibody.contacts.contacts[self.contactFrameName].fext).vector for i in range(self.N_h)])
         elif(self.PIN_REF_FRAME == pin.LOCAL_WORLD_ALIGNED or self.PIN_REF_FRAME == pin.WORLD):
             self.force_pred[nb_plan, :, :] = \
-                np.array([lwaMf.act(jMf.actInv(ocpSolver.problem.runningDatas[i].differential.multibody.contacts.contacts[self.contactFrameName].f)).vector for i in range(self.N_h)])
+                np.array([lwaMf.act(jMf.actInv(ocpSolver.problem.runningDatas[i].differential.multibody.contacts.contacts[self.contactFrameName].fext)).vector for i in range(self.N_h)])
         else:
             logger.error("The Pinocchio reference frame must be in ['LOCAL', LOCAL_WORLD_ALIGNED', 'WORLD']")
         self.f_curr = self.force_pred[nb_plan, 0, :]

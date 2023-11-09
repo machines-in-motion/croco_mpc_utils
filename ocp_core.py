@@ -29,6 +29,8 @@ class OptimalControlProblemAbstract:
 
     self.__dict__ = config
     
+    self.check_config()
+
     self.rmodel = robot.model
     self.rdata = robot.data
 
@@ -47,14 +49,12 @@ class OptimalControlProblemAbstract:
     else: return True 
      
   def check_config(self):
-    self.check_attribute('SOLVER')
     self.check_attribute('dt')
     self.check_attribute('N_h')
     self.check_attribute('maxiter')
     self.check_attribute('q0')
     self.check_attribute('dq0')
     self.check_attribute('WHICH_COSTS')
-    # self.check_attribute('armature')
 
   def create_contact_model(self, contact_config, state, actuation):
     '''
