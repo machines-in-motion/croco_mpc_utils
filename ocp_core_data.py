@@ -1193,7 +1193,7 @@ class MPCDataHandlerAbstract:
       handles_p, labels_p = ax[0,0].get_legend_handles_labels()
       fig.legend(handles_p, labels_p, loc='upper right', prop={'size': 16})
       # Titles
-      fig.suptitle('End-effector forces (LOCAL)', size=18)
+      fig.suptitle('End-effector forces', size=18)
       # Save figs
       if(SAVE):
           figs = {'f': fig}
