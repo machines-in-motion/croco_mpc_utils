@@ -33,16 +33,6 @@ class OptimalControlProblemClassicalWithConstraints(OptimalControlProblemClassic
     Override base class checks if necessary
     '''
     super().check_config()
-    self.check_attribute('WHICH_CONSTRAINTS')
-    self.check_attribute('use_filter_ls')
-    self.check_attribute('filter_size')
-    self.check_attribute('warm_start')
-    self.check_attribute('termination_tol')
-    self.check_attribute('max_qp_iters')
-    self.check_attribute('qp_termination_tol_abs')
-    self.check_attribute('qp_termination_tol_rel')
-    self.check_attribute('warm_start_y')
-    self.check_attribute('reset_rho')
 
   def create_constraint_model_manager(self, state, actuation, node_id):
     '''
@@ -65,7 +55,8 @@ class OptimalControlProblemClassicalWithConstraints(OptimalControlProblemClassic
     if('forceBox' in self.WHICH_CONSTRAINTS and node_id != 0 and node_id != self.N_h):
       forceBoxConstraint = self.create_force_constraint(state, actuation)
       constraintModelManager.addConstraint('forceBox', forceBoxConstraint)
-
+    return constraintModelManager
+  
   def create_differential_action_model(self, state, actuation, constraintModelManager):
     '''
     Initialize a differential action model with or without contacts, 
