@@ -462,38 +462,42 @@ class MPCDataHandlerClassical(MPCDataHandlerAbstract):
     return plot_data
     
   def extract_solver_data(self, plot_data):
-    nq = self.nq ; nv = self.nv ; nu = nq ; nx = nq + nv
-    # Get SVD & diagonal of Ricatti + record in sim data
-    plot_data['K_svd'] = np.zeros((self.N_plan, self.N_h, nq))
-    plot_data['Kp_diag'] = np.zeros((self.N_plan, self.N_h, nq))
-    plot_data['Kv_diag'] = np.zeros((self.N_plan, self.N_h, nv))
-    plot_data['Ktau_diag'] = np.zeros((self.N_plan, self.N_h, nu))
-    for i in range(self.N_plan):
-      for j in range(self.N_h):
-        plot_data['Kp_diag'][i, j, :] = self.K[i, j, :, :nq].diagonal()
-        plot_data['Kv_diag'][i, j, :] = self.K[i, j, :, nq:nq+nv].diagonal()
-        plot_data['Ktau_diag'][i, j, :] = self.K[i, j, :, -nu:].diagonal()
-        _, sv, _ = np.linalg.svd(self.K[i, j, :, :])
-        plot_data['K_svd'][i, j, :] = np.sort(sv)[::-1]
-    # Get diagonal and eigenvals of Vxx + record in sim data
-    plot_data['Vxx_diag'] = np.zeros((self.N_plan,self.N_h+1, nx))
-    plot_data['Vxx_eig'] = np.zeros((self.N_plan, self.N_h+1, nx))
-    for i in range(self.N_plan):
-      for j in range(self.N_h+1):
-        plot_data['Vxx_diag'][i, j, :] = self.Vxx[i, j, :, :].diagonal()
-        plot_data['Vxx_eig'][i, j, :] = np.sort(np.linalg.eigvals(self.Vxx[i, j, :, :]))[::-1]
-    # Get diagonal and eigenvals of Quu + record in sim data
-    plot_data['Quu_diag'] = np.zeros((self.N_plan,self.N_h, nu))
-    plot_data['Quu_eig'] = np.zeros((self.N_plan, self.N_h, nu))
-    for i in range(self.N_plan):
-      for j in range(self.N_h):
-        plot_data['Quu_diag'][i, j, :] = self.Quu[i, j, :, :].diagonal()
-        plot_data['Quu_eig'][i, j, :] = np.sort(np.linalg.eigvals(self.Quu[i, j, :, :]))[::-1]
-    # Get Jacobian
-    plot_data['J_rank'] = self.J_rank
-    # Get solve regs
-    plot_data['xreg'] = self.xreg
-    plot_data['ureg'] = self.ureg
+    # nq = self.nq ; nv = self.nv ; nu = nq ; nx = nq + nv
+    # # Get SVD & diagonal of Ricatti + record in sim data
+    # plot_data['K_svd'] = np.zeros((self.N_plan, self.N_h, nq))
+    # plot_data['Kp_diag'] = np.zeros((self.N_plan, self.N_h, nq))
+    # plot_data['Kv_diag'] = np.zeros((self.N_plan, self.N_h, nv))
+    # plot_data['Ktau_diag'] = np.zeros((self.N_plan, self.N_h, nu))
+    # for i in range(self.N_plan):
+    #   for j in range(self.N_h):
+    #     plot_data['Kp_diag'][i, j, :] = self.K[i, j, :, :nq].diagonal()
+    #     plot_data['Kv_diag'][i, j, :] = self.K[i, j, :, nq:nq+nv].diagonal()
+    #     plot_data['Ktau_diag'][i, j, :] = self.K[i, j, :, -nu:].diagonal()
+    #     _, sv, _ = np.linalg.svd(self.K[i, j, :, :])
+    #     plot_data['K_svd'][i, j, :] = np.sort(sv)[::-1]
+    # # Get diagonal and eigenvals of Vxx + record in sim data
+    # plot_data['Vxx_diag'] = np.zeros((self.N_plan,self.N_h+1, nx))
+    # plot_data['Vxx_eig'] = np.zeros((self.N_plan, self.N_h+1, nx))
+    # for i in range(self.N_plan):
+    #   for j in range(self.N_h+1):
+    #     plot_data['Vxx_diag'][i, j, :] = self.Vxx[i, j, :, :].diagonal()
+    #     plot_data['Vxx_eig'][i, j, :] = np.sort(np.linalg.eigvals(self.Vxx[i, j, :, :]))[::-1]
+    # # Get diagonal and eigenvals of Quu + record in sim data
+    # plot_data['Quu_diag'] = np.zeros((self.N_plan,self.N_h, nu))
+    # plot_data['Quu_eig'] = np.zeros((self.N_plan, self.N_h, nu))
+    # for i in range(self.N_plan):
+    #   for j in range(self.N_h):
+    #     plot_data['Quu_diag'][i, j, :] = self.Quu[i, j, :, :].diagonal()
+    #     plot_data['Quu_eig'][i, j, :] = np.sort(np.linalg.eigvals(self.Quu[i, j, :, :]))[::-1]
+    # # Get Jacobian
+    # plot_data['J_rank'] = self.J_rank
+    # # Get solve regs
+    # plot_data['xreg'] = self.xreg
+    # plot_data['ureg'] = self.ureg
+    plot_data['iter'] = self.iter
+    plot_data['KKT']  = self.KKT
+    plot_data['maxiter']  = self.maxiter
+    plot_data['solver_termination_tolerance']  = self.solver_termination_tolerance
   
   # Plot data - classical OCP specific plotting functions
   def plot_mpc_results(self, plot_data, which_plots=None, PLOT_PREDICTIONS=False, 
@@ -545,7 +549,6 @@ class MPCDataHandlerClassical(MPCDataHandlerAbstract):
                                               SAVE=SAVE, SAVE_DIR=SAVE_DIR, SAVE_NAME=SAVE_NAME,
                                               SHOW=False, AUTOSCALE=AUTOSCALE)
 
-
       if('K' in which_plots or which_plots is None or which_plots =='all' or 'all' in which_plots):
           if('K_diag' in plot_data.keys()):
               plots['K_diag'] = self.plot_mpc_ricatti_diag(plot_data, SAVE=SAVE, SAVE_DIR=SAVE_DIR, SAVE_NAME=SAVE_NAME,
@@ -564,7 +567,7 @@ class MPCDataHandlerClassical(MPCDataHandlerAbstract):
 
       if('S' in which_plots or which_plots is None or which_plots =='all' or 'all' in which_plots):
           if('S' in plot_data.keys()):
-              plots['S'] = self.plot_mpc_solver(plot_data, SAVE=SAVE, SAVE_DIR=SAVE_DIR, SAVE_NAME=SAVE_NAME,
+              plots['S'] = self.plot_mpc_solver_reg(plot_data, SAVE=SAVE, SAVE_DIR=SAVE_DIR, SAVE_NAME=SAVE_NAME,
                                                   SHOW=False)
 
       if('J' in which_plots or which_plots is None or which_plots =='all' or 'all' in which_plots):
@@ -579,7 +582,9 @@ class MPCDataHandlerClassical(MPCDataHandlerAbstract):
           if('Q_eig' in plot_data.keys()):
               plots['Q_eig'] = self.plot_mpc_Quu_eig(plot_data, SAVE=SAVE, SAVE_DIR=SAVE_DIR, SAVE_NAME=SAVE_NAME,
                                               SHOW=False)
-      
+      if('solver' in which_plots or which_plots is None or which_plots =='all' or 'all' in which_plots):
+          plots['solver'] = self.plot_mpc_solver(plot_data, SAVE=SAVE, SAVE_DIR=SAVE_DIR, SAVE_NAME=SAVE_NAME,
+                                                  SHOW=False)
       if(SHOW):
           plt.show() 
 

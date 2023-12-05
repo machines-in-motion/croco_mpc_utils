@@ -556,7 +556,7 @@ class MPCDataHandlerAbstract:
   '''
 
   def __init__(self, config, robot):
-
+    logger.warning(str(config['TORQUE_TRACKING']))
     self.__dict__ = config
 
     self.rmodel = robot.model
@@ -673,12 +673,14 @@ class MPCDataHandlerAbstract:
     '''
     Allocate data for OCP solver stuff (useful to debug)
     '''
-    self.K      = np.zeros((self.N_plan, self.N_h, self.nq, self.nx))     # Ricatti gains (K_0)
-    self.Vxx    = np.zeros((self.N_plan, self.N_h+1, self.nx, self.nx)) # Hessian of the Value Function  
-    self.Quu    = np.zeros((self.N_plan, self.N_h, self.nu, self.nu))   # Hessian of the Value Function 
-    self.xreg   = np.zeros(self.N_plan)                                                   # State reg in solver (diag of Vxx)
-    self.ureg   = np.zeros(self.N_plan)                                                   # Control reg in solver (diag of Quu)
-    self.J_rank = np.zeros(self.N_plan)                                                 # Rank of Jacobian
+    # self.K      = np.zeros((self.N_plan, self.N_h, self.nq, self.nx))     # Ricatti gains (K_0)
+    # self.Vxx    = np.zeros((self.N_plan, self.N_h+1, self.nx, self.nx)) # Hessian of the Value Function  
+    # self.Quu    = np.zeros((self.N_plan, self.N_h, self.nu, self.nu))   # Hessian of the Value Function 
+    # self.xreg   = np.zeros(self.N_plan)                                                   # State reg in solver (diag of Vxx)
+    # self.ureg   = np.zeros(self.N_plan)                                                   # Control reg in solver (diag of Quu)
+    # self.J_rank = np.zeros(self.N_plan)                                                 # Rank of Jacobian
+    self.iter     = np.zeros(self.N_plan)                                                 # Rank of Jacobian
+    self.KKT      = np.zeros(self.N_plan)                                                 # Rank of Jacobian
 
   def init_cost_references(self):
     '''
@@ -761,12 +763,14 @@ class MPCDataHandlerAbstract:
     Handy function to record solver related data during MPC simulation
     '''
     if(self.RECORD_SOLVER_DATA):
-      self.K[nb_plan, :, :, :]   = np.array(ocpSolver.K)         # Ricatti gains
-      self.Vxx[nb_plan, :, :, :] = np.array(ocpSolver.Vxx)       # Hessians of V.F. 
-      self.Quu[nb_plan, :, :, :] = np.array(ocpSolver.Quu)       # Hessians of Q 
-      self.xreg[nb_plan]         = ocpSolver.x_reg               # Reg solver on x
-      self.ureg[nb_plan]         = ocpSolver.u_reg               # Reg solver on u
-      self.J_rank[nb_plan]       = np.linalg.matrix_rank(ocpSolver.problem.runningDatas[0].differential.pinocchio.J)
+      self.iter[nb_plan] = ocpSolver.iter    # Number of iterations used
+      self.KKT[nb_plan]  = ocpSolver.KKT     # KKT residual
+      # self.K[nb_plan, :, :, :]   = np.array(ocpSolver.K)         # Ricatti gains
+      # self.Vxx[nb_plan, :, :, :] = np.array(ocpSolver.Vxx)       # Hessians of V.F. 
+      # self.Quu[nb_plan, :, :, :] = np.array(ocpSolver.Quu)       # Hessians of Q 
+      # self.xreg[nb_plan]         = ocpSolver.x_reg               # Reg solver on x
+      # self.ureg[nb_plan]         = ocpSolver.u_reg               # Reg solver on u
+      # self.J_rank[nb_plan]       = np.linalg.matrix_rank(ocpSolver.problem.runningDatas[0].differential.pinocchio.J)
 
   def record_cost_references(self, nb_plan, ocpSolver):
     '''
@@ -1361,10 +1365,10 @@ class MPCDataHandlerAbstract:
       
       return fig_Q
 
-  def plot_mpc_solver(self, plot_data, SAVE=False, SAVE_DIR=None, SAVE_NAME=None,
+  def plot_mpc_solver_reg(self, plot_data, SAVE=False, SAVE_DIR=None, SAVE_NAME=None,
                             SHOW=True):
       '''
-      Plot solver data
+      Plot solver data (xreg, ureg)
       Input:
         plot_data                 : plotting data
         PLOT_PREDICTIONS          : True or False
@@ -1407,6 +1411,55 @@ class MPCDataHandlerAbstract:
           plt.show() 
       
       return fig_S
+
+  def plot_mpc_solver(self, plot_data, SAVE=False, SAVE_DIR=None, SAVE_NAME=None,
+                            SHOW=True):
+      '''
+      Plot solver data (iter, KKT)
+      Input:
+        plot_data                 : plotting data
+        PLOT_PREDICTIONS          : True or False
+        pred_plot_sampling        : plot every pred_plot_sampling prediction 
+                                    to avoid huge amount of plotted data 
+                                    ("1" = plot all)
+        SAVE, SAVE_DIR, SAVE_NAME : save plots as .png
+        SHOW                      : show plots
+      '''
+      logger.info('Plotting solver data...')
+      T_tot = plot_data['T_tot']
+      N_plan = plot_data['N_plan']
+      dt_plan = plot_data['dt_plan']
+      # Create time spans for X and U + Create figs and subplots
+      t_span_plan = np.linspace(0, T_tot-dt_plan, N_plan)
+      fig_S, ax_S = plt.subplots(2, 1, figsize=(19.2,10.8), sharex='col') 
+      # Xreg
+      ax_S[0].plot(t_span_plan, plot_data['iter'], 'b-', label='# iter')
+      ax_S[0].plot(t_span_plan, N_plan*[plot_data['maxiter']], label= 'max. iter', color = 'r')
+      ax_S[0].set(xlabel='t (s)', ylabel='$iter$')
+      ax_S[0].grid(True)
+      # Ureg
+      ax_S[1].plot(t_span_plan, plot_data['KKT'], 'r-', label='KKT residual')
+      ax_S[1].plot(t_span_plan, N_plan*[plot_data['solver_termination_tolerance']], label= 'KKT residual tolerance', color = 'r')
+      ax_S[1].set(xlabel='t (s)', ylabel='$KKT$')
+      ax_S[1].grid(True)
+
+      # Titles
+      fig_S.suptitle('OCP solver iterations and KKT residual norm', size=16)
+      # Save figs
+      if(SAVE):
+          figs = {'S': fig_S}
+          if(SAVE_DIR is None):
+              logger.error("Please specify SAVE_DIR")
+          if(SAVE_NAME is None):
+              SAVE_NAME = 'testfig'
+          for name, fig in figs.items():
+              fig.savefig(SAVE_DIR + '/' +str(name) + '_' + SAVE_NAME +'.png')
+      
+      if(SHOW):
+          plt.show() 
+      
+      return fig_S
+
 
   def plot_mpc_jacobian(self, plot_data, SAVE=False, SAVE_DIR=None, SAVE_NAME=None,
                               SHOW=True):
