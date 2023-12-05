@@ -521,14 +521,14 @@ class MPCDataHandlerClassical(MPCDataHandlerAbstract):
 
       plots = {}
 
-      if('x' in which_plots or which_plots is None or which_plots =='all' or 'all' in which_plots):
-          plots['x'] = self.plot_mpc_state(plot_data, PLOT_PREDICTIONS=PLOT_PREDICTIONS, 
+      if('state' in which_plots or which_plots is None or which_plots =='all' or 'all' in which_plots):
+          plots['state'] = self.plot_mpc_state(plot_data, PLOT_PREDICTIONS=PLOT_PREDICTIONS, 
                                             pred_plot_sampling=pred_plot_sampling, 
                                             SAVE=SAVE, SAVE_DIR=SAVE_DIR, SAVE_NAME=SAVE_NAME,
                                             SHOW=False, AUTOSCALE=AUTOSCALE)
       
-      if('u' in which_plots or which_plots is None or which_plots =='all' or 'all' in which_plots):
-          plots['u'] = self.plot_mpc_control(plot_data, PLOT_PREDICTIONS=PLOT_PREDICTIONS, 
+      if('control' in which_plots or which_plots is None or which_plots =='all' or 'all' in which_plots):
+          plots['control'] = self.plot_mpc_control(plot_data, PLOT_PREDICTIONS=PLOT_PREDICTIONS, 
                                               pred_plot_sampling=pred_plot_sampling, 
                                               SAVE=SAVE, SAVE_DIR=SAVE_DIR, SAVE_NAME=SAVE_NAME,
                                               SHOW=False, AUTOSCALE=AUTOSCALE)
@@ -543,8 +543,8 @@ class MPCDataHandlerClassical(MPCDataHandlerAbstract):
                                               SAVE=SAVE, SAVE_DIR=SAVE_DIR, SAVE_NAME=SAVE_NAME,
                                               SHOW=False, AUTOSCALE=AUTOSCALE)
 
-      if('f' in which_plots or which_plots is None or which_plots =='all' or 'all' in which_plots):
-          plots['f'] = self.plot_mpc_force(plot_data, PLOT_PREDICTIONS=PLOT_PREDICTIONS, 
+      if('force' in which_plots or which_plots is None or which_plots =='all' or 'all' in which_plots):
+          plots['force'] = self.plot_mpc_force(plot_data, PLOT_PREDICTIONS=PLOT_PREDICTIONS, 
                                               pred_plot_sampling=pred_plot_sampling, 
                                               SAVE=SAVE, SAVE_DIR=SAVE_DIR, SAVE_NAME=SAVE_NAME,
                                               SHOW=False, AUTOSCALE=AUTOSCALE)
