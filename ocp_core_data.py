@@ -556,7 +556,6 @@ class MPCDataHandlerAbstract:
   '''
 
   def __init__(self, config, robot):
-    logger.warning(str(config['TORQUE_TRACKING']))
     self.__dict__ = config
 
     self.rmodel = robot.model
