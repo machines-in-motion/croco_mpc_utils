@@ -336,17 +336,8 @@ class MPCDataHandlerClassical(MPCDataHandlerAbstract):
     self.u_curr = self.ctrl_pred[nb_plan, 0, :]     # u0* = optimal control   
     # Record forces predictions in the right frame + extract current & next force
     if(self.is_contact):
-        id_endeff = self.rmodel.getFrameId(self.contactFrameName)
-        jMf = self.rmodel.frames[id_endeff].placement
-        lwaMf = pin.SE3(self.rdata.oMf[id_endeff].rotation, np.zeros(3))
-        if(self.PIN_REF_FRAME == pin.LOCAL):
-            self.force_pred[nb_plan, :, :] = \
-                np.array([jMf.actInv(ocpSolver.problem.runningDatas[i].differential.multibody.contacts.contacts[self.contactFrameName].fext).vector for i in range(self.N_h)])
-        elif(self.PIN_REF_FRAME == pin.LOCAL_WORLD_ALIGNED or self.PIN_REF_FRAME == pin.WORLD):
-            self.force_pred[nb_plan, :, :] = \
-                np.array([lwaMf.act(jMf.actInv(ocpSolver.problem.runningDatas[i].differential.multibody.contacts.contacts[self.contactFrameName].fext)).vector for i in range(self.N_h)])
-        else:
-            logger.error("The Pinocchio reference frame must be in ['LOCAL', LOCAL_WORLD_ALIGNED', 'WORLD']")
+        self.force_pred[nb_plan, :, :] = \
+            np.array([ocpSolver.problem.runningDatas[i].differential.multibody.contacts.contacts[self.contactFrameName].f.vector for i in range(self.N_h)])
         self.f_curr = self.force_pred[nb_plan, 0, :]
         self.f_pred = self.force_pred[nb_plan, 1, :]
 
