@@ -11,11 +11,20 @@ WHICH_PLOTS: ['ee']                                  # which plots to generate
 # to select from the list : 'stateBox', 'ctrlBox', 'translationBox', 'None'
 
 #### FOR THE JOINT CONSTRAINT
-WHICH_CONSTRAINTS: ['stateBox']
+WHICH_CONSTRAINTS: ['stateBox', "collisionBox"]
 stateLowerLimit: [-0.05, -2.0944 , -2.96706, -2.0944 , -2.96706, -2.0944 , -3.05433,
                   -1.48353, -1.48353, -1.74533, -1.309  , -2.26893, -2.35619, -2.35619] #'DEFAULT'
 stateUpperLimit: [0.05, 2.0944 , 2.96706, 2.0944 , 2.96706, 2.0944 , 3.05433,
                   1.48353, 1.48353, 1.74533, 1.309  , 2.26893, 2.35619, 2.35619] #'DEFAULT'
+
+#### FOR THE COLLISION CONSTRAINT
+safetyMargin: 0.02
+collisionPairs:     
+- ["L7_1", "L2_5"]
+- ["L7_2", "L2_5"]
+# The collision shapes must be in the collision model of the robot, and must be hppfcl.ShapeBase.
+# To have an as efficient collision avoidance as possible, it must be between strictly convex objects, such as 
+# capsules and spheres.
 
 # ### FOR THE HALF-PLANE CONSTRAINT
 # WHICH_CONSTRAINTS: ['translationBox']

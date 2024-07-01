@@ -8,6 +8,8 @@
 @brief Abstract wrapper around Crocoddyl's API to initialize an OCP from a templated YAML config file
 """
 
+from typing import List
+
 import numpy as np
 
 import crocoddyl
@@ -33,6 +35,8 @@ class OptimalControlProblemAbstract:
 
     self.rmodel = robot.model
     self.rdata = robot.data
+    self.cmodel = robot.collision_model
+    self.cdata = self.cmodel.createData() #! Is there a collision data in robot? 
 
     self.nq = robot.model.nq
     self.nv = robot.model.nv
@@ -561,3 +565,55 @@ class OptimalControlProblemAbstract:
     else:
       logger.error("Force constraint should be of type 1d, 3d or 6d !")
     return forceBoxCstr 
+  
+  def create_collision_constraints(self, state) -> List:
+    """Create collision box constraints models. 
+
+    Returns:
+        List: List of collision constraint models.
+    """
+    from colmpc import ResidualDistanceCollision
+    
+    self.check_attribute("safetyMargin")
+    self.check_attribute("collisionPairs")
+
+    if (self.safetyMargin == "None"):
+      safety = 0
+    else:
+      safety = float(self.safetyMargin)
+    
+    if (len(self.collisionPairs) == 0):
+      logger.info("There is no collision pairs!")
+    
+    # Going through all the collisions
+    for collision in self.collisionPairs:
+      col1,col2 = collision[0], collision[1]
+      if not self.cmodel.existGeometryName(col1) or  not self.cmodel.existGeometryName(col2):
+        logger.error(f"The geometry names {col1} and/or {col2} do not exist in the current collision model.")
+
+      # Creating the collision pair
+      self.cmodel.addCollisionPair(
+        pin.CollisionPair(
+           self.cmodel.getGeometryId(col1),
+           self.cmodel.getGeometryId(col2)
+        )
+      )
+    
+    # Now that the collision pairs are all added, creating the constraints
+    
+    CollisionBoxCstrs = []
+    
+    if len(self.cmodel.collisionPairs) != 0:
+            for col_idx in range(len(self.cmodel.collisionPairs)):
+                obstacleDistanceResidual = ResidualDistanceCollision(state, 7, self.cmodel, col_idx)
+
+                # Creating the inequality constraint
+                collision_constraint = crocoddyl.ConstraintModelResidual(
+                    state,
+                    obstacleDistanceResidual,
+                    np.array([safety]),
+                    np.array([np.inf]),
+                )
+                CollisionBoxCstrs.append(collision_constraint)
+    
+    return CollisionBoxCstrs
