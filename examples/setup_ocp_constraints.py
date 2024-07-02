@@ -18,7 +18,7 @@ import mim_solvers
 config = load_yaml_file('ocp_constraint.yml')
 
 # Import robot model (pinocchio wrapper)
-robot  = load_pinocchio_wrapper('iiwa')
+robot  = load_pinocchio_wrapper('iiwa_convex')
 
 # Setup the OCP using the wrapper
 q0 = np.asarray(config['q0'])

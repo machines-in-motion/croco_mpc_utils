@@ -55,6 +55,11 @@ class OptimalControlProblemClassicalWithConstraints(OptimalControlProblemClassic
     if('forceBox' in self.WHICH_CONSTRAINTS and node_id != 0 and node_id != self.N_h):
       forceBoxConstraint = self.create_force_constraint(state, actuation)
       constraintModelManager.addConstraint('forceBox', forceBoxConstraint)
+    if('collisionBox' in self.WHICH_CONSTRAINTS):
+        collisionBoxConstraints = self.create_collision_constraints(state)
+        for i, collisionBoxConstraint in enumerate(collisionBoxConstraints):
+          constraintModelManager.addConstraint('collisionBox_' + str(i), collisionBoxConstraint)
+
     return constraintModelManager
   
   def create_differential_action_model(self, state, actuation, constraintModelManager):
