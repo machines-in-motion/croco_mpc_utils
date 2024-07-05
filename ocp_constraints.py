@@ -56,7 +56,7 @@ class OptimalControlProblemClassicalWithConstraints(OptimalControlProblemClassic
       forceBoxConstraint = self.create_force_constraint(state, actuation)
       constraintModelManager.addConstraint('forceBox', forceBoxConstraint)
     if('collisionBox' in self.WHICH_CONSTRAINTS):
-        collisionBoxConstraints = self.create_collision_constraints(state)
+        collisionBoxConstraints = self.create_collision_constraints(state, actuation)
         for i, collisionBoxConstraint in enumerate(collisionBoxConstraints):
           constraintModelManager.addConstraint('collisionBox_' + str(i), collisionBoxConstraint)
 
