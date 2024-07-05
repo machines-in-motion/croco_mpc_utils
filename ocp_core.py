@@ -566,7 +566,7 @@ class OptimalControlProblemAbstract:
       logger.error("Force constraint should be of type 1d, 3d or 6d !")
     return forceBoxCstr 
   
-  def create_collision_constraints(self, state) -> List:
+  def create_collision_constraints(self, state, actuation) -> List:
     """Create collision box constraints models. 
 
     Returns:
@@ -605,7 +605,7 @@ class OptimalControlProblemAbstract:
     
     if len(self.cmodel.collisionPairs) != 0:
             for col_idx in range(len(self.cmodel.collisionPairs)):
-                obstacleDistanceResidual = ResidualDistanceCollision(state, 7, self.cmodel, col_idx)
+                obstacleDistanceResidual = ResidualDistanceCollision(state, actuation.nu, self.cmodel, col_idx)
 
                 # Creating the inequality constraint
                 collision_constraint = crocoddyl.ConstraintModelResidual(
