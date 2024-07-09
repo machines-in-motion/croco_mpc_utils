@@ -94,11 +94,12 @@ class OptimalControlProblemClassicalWithConstraints(OptimalControlProblemClassic
     super().success_log()
     logger.info("    CONSTRAINTS   = "+str(self.WHICH_CONSTRAINTS))
        
-  def initialize(self, x0):
+  def initialize(self, x0, terminalModel=None):
     '''
     Initializes an Optimal Control Problem (OCP) from YAML config parameters and initial state
       INPUT: 
-          x0          : initial state of shooting problem
+          x0            : initial state of shooting problem
+          terminalModel : custom terminal action model (e.g. learned value function)
       OUTPUT:
           crocoddyl.ShootingProblem object 
 
@@ -127,10 +128,11 @@ class OptimalControlProblemClassicalWithConstraints(OptimalControlProblemClassic
         self.init_running_model(state, actuation, runningModels[i], contactModels)
 
     # Terminal model
-    constraintModelManager = self.create_constraint_model_manager(state, actuation, self.N_h)
-    dam_t, contactModels = self.create_differential_action_model(state, actuation, constraintModelManager)  
-    terminalModel = crocoddyl.IntegratedActionModelEuler( dam_t, stepTime=0. )
-    self.init_terminal_model(state, actuation, terminalModel, contactModels)
+    if(terminalModel is None):
+      constraintModelManager = self.create_constraint_model_manager(state, actuation, self.N_h)
+      dam_t, contactModels = self.create_differential_action_model(state, actuation, constraintModelManager)  
+      terminalModel = crocoddyl.IntegratedActionModelEuler( dam_t, stepTime=0. )
+      self.init_terminal_model(state, actuation, terminalModel, contactModels)
     
     logger.info("Created IAMs.")  
 
