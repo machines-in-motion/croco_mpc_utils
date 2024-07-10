@@ -30,7 +30,30 @@ class OCPDataHandlerClassical(OCPDataHandlerAbstract):
     super().__init__(ocp)
 
   def extract_data(self, xs, us): #, ee_frame_name, ct_frame_name):
-    return super().extract_data(xs, us) #, ee_frame_name, ct_frame_name)
+    ocp_data = super().extract_data(xs, us) #, ee_frame_name, ct_frame_name)
+    # Parse constraints
+    self.find_constraints()
+    return ocp_data
+
+  def find_constraints(self):
+      '''
+      Detects the type of constraints defined in the OCP
+      '''
+      cstrNames = []
+      for m in self.ocp.runningModels:
+        if(hasattr(m.differential, 'constraints') and m.differential.constraints is not None):
+          for cstr_name in m.differential.constraints.constraints.todict().keys():
+            if(cstr_name not in cstrNames):
+              cstrNames.append(cstr_name)
+      logger.warning("Found "+str(len(cstrNames))+" constraints names in the cost function !")
+      if(len(cstrNames) > 1):
+        logger.warning("Found "+str(len(cstrNames))+" constraints names in the cost function !")
+        logger.warning(str(cstrNames))
+      if(len(cstrNames) == 0):
+        logger.warning("Did not find any constraints name id.")
+      if(len(cstrNames) == 0):
+        self.HAS_CONSTRAINTS = False
+      return cstrNames
 
   def plot_ocp_results(self, OCP_DATA, which_plots='all', labels=None, markers=None, colors=None, sampling_plot=1, SHOW=False):
       '''

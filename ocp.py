@@ -48,29 +48,85 @@ class OptimalControlProblemClassical(OptimalControlProblemAbstract):
       self.nb_contacts = len(self.contacts)
       self.contact_types = [ct['contactModelType'] for ct in self.contacts]
       logger.debug("Detected "+str(len(self.contacts))+" contacts with types = "+str(self.contact_types))
-      
-  def create_differential_action_model(self, state, actuation):
+
+  def parse_constraints(self):
     '''
-    Initialize a differential action model with or without contacts
+    Parses the YAML dict of constraints and count them
+    '''
+    if(not hasattr(self, 'WHICH_CONSTRAINTS')):
+      self.nb_constraints = 0
+    else:
+      if('None' in self.WHICH_CONSTRAINTS):
+        self.nb_constraints = 0
+      else:
+        self.nb_constraints = len(self.WHICH_CONSTRAINTS)
+
+  def create_constraint_model_manager(self, state, actuation, node_id):
+    '''
+    Initialize a constraint model manager and adds constraints to it 
+    '''
+    constraintModelManager = crocoddyl.ConstraintModelManager(state, actuation.nu)
+    # State limits
+    if('stateBox' in self.WHICH_CONSTRAINTS and node_id != 0):
+      stateBoxConstraint = self.create_state_constraint(state, actuation)   
+      constraintModelManager.addConstraint('stateBox', stateBoxConstraint)
+    # Control limits
+    if('ctrlBox' in self.WHICH_CONSTRAINTS):
+      ctrlBoxConstraint = self.create_ctrl_constraint(state, actuation)
+      constraintModelManager.addConstraint('ctrlBox', ctrlBoxConstraint)
+    # End-effector position limits
+    if('translationBox' in self.WHICH_CONSTRAINTS and node_id != 0):
+      translationBoxConstraint = self.create_translation_constraint(state, actuation)
+      constraintModelManager.addConstraint('translationBox', translationBoxConstraint)
+    # Contact force 
+    if('forceBox' in self.WHICH_CONSTRAINTS and node_id != 0 and node_id != self.N_h):
+      forceBoxConstraint = self.create_force_constraint(state, actuation)
+      constraintModelManager.addConstraint('forceBox', forceBoxConstraint)
+    if('collisionBox' in self.WHICH_CONSTRAINTS):
+        collisionBoxConstraints = self.create_collision_constraints(state, actuation)
+        for i, collisionBoxConstraint in enumerate(collisionBoxConstraints):
+          constraintModelManager.addConstraint('collisionBox_' + str(i), collisionBoxConstraint)
+
+    return constraintModelManager
+
+  def create_differential_action_model(self, state, actuation, constraintModelManager=None):
+    '''
+    Initialize a differential action model with or without contacts, 
+    and with explicit constraints
     '''
     # If there are contacts, defined constrained DAM
     contactModels = []
     if(self.nb_contacts > 0):
       for ct in self.contacts:
-        contactModels.append(self.create_contact_model(ct, state, actuation))   
-      dam = crocoddyl.DifferentialActionModelContactFwdDynamics(state, 
-                                                                actuation, 
-                                                                crocoddyl.ContactModelMultiple(state, actuation.nu), 
-                                                                crocoddyl.CostModelSum(state, nu=actuation.nu), 
-                                                                inv_damping=0., 
-                                                                enable_force=True)
+        contactModels.append(self.create_contact_model(ct, state, actuation))  
+        if(constraintModelManager is None):
+          dam = crocoddyl.DifferentialActionModelContactFwdDynamics(state, 
+                                                                    actuation, 
+                                                                    crocoddyl.ContactModelMultiple(state, actuation.nu), 
+                                                                    crocoddyl.CostModelSum(state, nu=actuation.nu), 
+                                                                    inv_damping=0., 
+                                                                    enable_force=True)
+        else:
+          dam = crocoddyl.DifferentialActionModelContactFwdDynamics(state, 
+                                                                    actuation, 
+                                                                    crocoddyl.ContactModelMultiple(state, actuation.nu), 
+                                                                    crocoddyl.CostModelSum(state, nu=actuation.nu), 
+                                                                    constraintModelManager,
+                                                                    inv_damping=0., 
+                                                                    enable_force=True)
     # Otherwise just create free DAM
     else:
-      dam = crocoddyl.DifferentialActionModelFreeFwdDynamics(state, 
-                                                              actuation, 
-                                                              crocoddyl.CostModelSum(state, nu=actuation.nu))
+      if(constraintModelManager is None):
+        dam = crocoddyl.DifferentialActionModelFreeFwdDynamics(state, 
+                                                                actuation, 
+                                                                crocoddyl.CostModelSum(state, nu=actuation.nu))
+      else:
+        dam = crocoddyl.DifferentialActionModelFreeFwdDynamics(state, 
+                                                                actuation, 
+                                                                crocoddyl.CostModelSum(state, nu=actuation.nu),
+                                                                constraintModelManager)
     return dam, contactModels
-  
+
   def init_running_model(self, state, actuation, runningModel, contactModels):
     '''
   Populate running model with costs and contacts
@@ -185,7 +241,9 @@ class OptimalControlProblemClassical(OptimalControlProblemAbstract):
         logger.info("      Found [ "+str(ct['contactModelType'])+" ] (Baumgarte stab. gains = "+str(ct['contactModelGains'])+" , active = "+str(ct['active'])+" )")
     else:
       logger.info("    self.nb_contacts = "+str(self.nb_contacts))
-      
+    if(self.nb_constraints > 0):
+      logger.info("    CONSTRAINTS   = "+str(self.WHICH_CONSTRAINTS))
+
   def initialize(self, x0, terminalModel=None):
     '''
     Initializes an Optimal Control Problem (OCP) from YAML config parameters and initial state
@@ -208,21 +266,33 @@ class OptimalControlProblemClassical(OptimalControlProblemAbstract):
   
   # Contact or not ?
     self.parse_contacts()
+  # Constraints or not ?
+    self.parse_constraints()
 
   # Create IAMs
     runningModels = []
     for i in range(self.N_h):  
       # Create DAM (Contact or FreeFwd), IAM Euler and initialize costs+contacts
-        dam, contactModels = self.create_differential_action_model(state, actuation) 
+        if(self.nb_constraints == 0):
+          dam, contactModels = self.create_differential_action_model(state, actuation) 
+        else:
+        # Create constraint manager and constraints
+          constraintModelManager = self.create_constraint_model_manager(state, actuation, i)
+        # Create DAM (Contact or FreeFwd), IAM Euler and initialize costs+contacts+constraints
+          dam, contactModels = self.create_differential_action_model(state, actuation, constraintModelManager) 
         runningModels.append(crocoddyl.IntegratedActionModelEuler(dam, stepTime=self.dt))
         self.init_running_model(state, actuation, runningModels[i], contactModels)
 
     # Terminal model
     if(terminalModel is None):
-      dam_t, contactModels = self.create_differential_action_model(state, actuation)  
+      if(self.nb_constraints == 0):
+        dam_t, contactModels = self.create_differential_action_model(state, actuation)  
+      else:
+        constraintModelManager = self.create_constraint_model_manager(state, actuation, self.N_h)
+        dam_t, contactModels = self.create_differential_action_model(state, actuation, constraintModelManager)  
       terminalModel = crocoddyl.IntegratedActionModelEuler( dam_t, stepTime=0. )
       self.init_terminal_model(state, actuation, terminalModel, contactModels)
-    
+
     logger.info("Created IAMs.")  
 
 
@@ -232,5 +302,6 @@ class OptimalControlProblemClassical(OptimalControlProblemAbstract):
 
   # Finish
     self.success_log()
+    
     return problem
 

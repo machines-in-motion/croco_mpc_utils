@@ -8,7 +8,7 @@ import numpy as np
 from mim_robots.robot_loader import load_pinocchio_wrapper
 
 from croco_mpc_utils.utils import load_yaml_file
-from croco_mpc_utils.ocp_constraints import OptimalControlProblemClassicalWithConstraints
+from croco_mpc_utils.ocp import OptimalControlProblemClassical
 from croco_mpc_utils.ocp_data import OCPDataHandlerClassical
 from croco_mpc_utils import pinocchio_utils
 
@@ -24,7 +24,7 @@ robot  = load_pinocchio_wrapper('iiwa_convex')
 q0 = np.asarray(config['q0'])
 v0 = np.asarray(config['dq0'])
 x0 = np.concatenate([q0, v0])
-ocp = OptimalControlProblemClassicalWithConstraints(robot, config).initialize(x0)
+ocp = OptimalControlProblemClassical(robot, config).initialize(x0)
 
 # Circle reference trajectory over the horizon
 radius = 0.3 ; omega = 2.
