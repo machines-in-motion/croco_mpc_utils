@@ -33,7 +33,39 @@ def rotate(se3_placement, rpy=[0., 0., 0.]):
     return se3_placement_rotated
 
 
-# Get frame position
+
+# Get frame pose (xyzquat)
+def get_XYZQUAT(q, pin_robot, id_endeff):
+    '''
+    Returns frame placement given q trajectory 
+        q         : joint positions
+        robot     : pinocchio wrapper
+        id_endeff : id of EE frame
+    '''
+    return get_XYZQUAT_(q, pin_robot.model, id_endeff)
+
+def get_XYZQUAT_(q, model, id_endeff):
+    '''
+    Returns frame placement given q trajectory 
+        q         : joint positions
+        model     : pinocchio model
+        id_endeff : id of EE frame
+    '''
+    data = model.createData()
+    if(type(q)==np.ndarray and len(q.shape)==1):
+        pin.forwardKinematics(model, data, q)
+        pin.updateFramePlacements(model, data)
+        M = pin.SE3ToXYZQUAT(data.oMf[id_endeff])
+    else:
+        N = np.shape(q)[0]
+        M = []
+        for i in range(N):
+            pin.forwardKinematics(model, data, q[i])
+            pin.updateFramePlacements(model, data)
+            M.append(pin.SE3ToXYZQUAT(data.oMf[id_endeff]))
+    return M
+
+# Get frame pose (SE3)
 def get_SE3(q, pin_robot, id_endeff):
     '''
     Returns frame placement given q trajectory 
@@ -41,7 +73,7 @@ def get_SE3(q, pin_robot, id_endeff):
         robot     : pinocchio wrapper
         id_endeff : id of EE frame
     '''
-    return get_p_(q, pin_robot.model, id_endeff)
+    return get_SE3_(q, pin_robot.model, id_endeff)
 
 def get_SE3_(q, model, id_endeff):
     '''
@@ -50,20 +82,20 @@ def get_SE3_(q, model, id_endeff):
         model     : pinocchio model
         id_endeff : id of EE frame
     '''
-    
+    logger.warning("This function might be faulty (does not match XYZQuat convention)")
     data = model.createData()
     if(type(q)==np.ndarray and len(q.shape)==1):
         pin.forwardKinematics(model, data, q)
         pin.updateFramePlacements(model, data)
-        p = data.oMf[id_endeff]
+        M = data.oMf[id_endeff]
     else:
         N = np.shape(q)[0]
-        p = []
+        M = []
         for i in range(N):
             pin.forwardKinematics(model, data, q[i])
             pin.updateFramePlacements(model, data)
-            p.append(data.oMf[id_endeff])
-    return p
+            M.append(data.oMf[id_endeff])
+    return M
 
 
 # Get frame position
