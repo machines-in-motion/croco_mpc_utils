@@ -29,7 +29,7 @@ class OptimalControlProblemAbstract:
   '''
   def __init__(self, robot, config):
 
-    self.__dict__ = config
+    self.__dict__ = config.copy()
     
     self.check_config()
 
