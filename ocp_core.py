@@ -623,11 +623,14 @@ class OptimalControlProblemAbstract:
     '''
     Create contact force box constraint model 
     '''
+    import force_feedback_mpc
     # Check attributes 
     self.check_attribute('frictionCoefficient')
     self.check_attribute('frictionConeFrameName')
+    fid = self.rmodel.getFrameId(self.frictionConeFrameName)
     # fid = self.rmodel.getFrameId(self.frictionConeFrameName)
-    residualModelFrictionCone = ResidualFrictionCone(state, self.frictionConeFrameName, self.frictionCoefficient, actuation.nu)
+    # residualModelFrictionCone = ResidualFrictionCone(state, self.frictionConeFrameName, self.frictionCoefficient, actuation.nu)
+    residualModelFrictionCone = force_feedback_mpc.ResidualModelFrictionCone(state, fid, self.frictionCoefficient, actuation.nu)
     frictionConeCstr = crocoddyl.ConstraintModelResidual(state, residualModelFrictionCone, np.array([0.]), np.array([np.inf]))
     return frictionConeCstr
   
@@ -637,7 +640,6 @@ class ResidualFrictionCone(crocoddyl.ResidualModelAbstract):
     def __init__(self, state, contact_name, mu, nu):
         crocoddyl.ResidualModelAbstract.__init__(self, state, 1, nu, True, True, True)
         self.mu = mu
-        print(contact_name)
         self.contact_name = contact_name
         
         self.dcone_df = np.zeros((1, 3))
