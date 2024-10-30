@@ -646,7 +646,6 @@ class ResidualFrictionCone(crocoddyl.ResidualModelAbstract):
 
     def calc(self, data, x, u=None): 
         F = data.shared.contacts.contacts[self.contact_name].f.vector[:3]   
-        print("F = ", F)
         data.r[0] = np.array([self.mu * F[2] - np.sqrt(F[0]**2 + F[1]**2)])
 
     def calcDiff(self, data, x, u=None):
