@@ -71,7 +71,7 @@ class OptimalControlProblemClassical(OptimalControlProblemAbstract):
       stateBoxConstraint = self.create_state_constraint(state, actuation)   
       constraintModelManager.addConstraint('stateBox', stateBoxConstraint)
     # Control limits
-    if('ctrlBox' in self.WHICH_CONSTRAINTS):
+    if('ctrlBox' in self.WHICH_CONSTRAINTS and node_id != self.N_h):
       ctrlBoxConstraint = self.create_ctrl_constraint(state, actuation)
       constraintModelManager.addConstraint('ctrlBox', ctrlBoxConstraint)
     # End-effector position limits
@@ -79,14 +79,16 @@ class OptimalControlProblemClassical(OptimalControlProblemAbstract):
       translationBoxConstraint = self.create_translation_constraint(state, actuation)
       constraintModelManager.addConstraint('translationBox', translationBoxConstraint)
     # Contact force 
-    if('forceBox' in self.WHICH_CONSTRAINTS and node_id != 0 and node_id != self.N_h):
+    if('forceBox' in self.WHICH_CONSTRAINTS and node_id != self.N_h):
       forceBoxConstraint = self.create_force_constraint(state, actuation)
       constraintModelManager.addConstraint('forceBox', forceBoxConstraint)
     if('collisionBox' in self.WHICH_CONSTRAINTS):
         collisionBoxConstraints = self.create_collision_constraints(state, actuation)
         for i, collisionBoxConstraint in enumerate(collisionBoxConstraints):
           constraintModelManager.addConstraint('collisionBox_' + str(i), collisionBoxConstraint)
-
+    if('frictionCone' in self.WHICH_CONSTRAINTS and node_id != self.N_h):
+      frictionConeConstraint = self.create_friction_cone_constraint(state, actuation)
+      constraintModelManager.addConstraint('frictionCone', frictionConeConstraint)
     return constraintModelManager
 
   def create_differential_action_model(self, state, actuation, constraintModelManager=None):
@@ -99,21 +101,21 @@ class OptimalControlProblemClassical(OptimalControlProblemAbstract):
     if(self.nb_contacts > 0):
       for ct in self.contacts:
         contactModels.append(self.create_contact_model(ct, state, actuation))  
-        if(constraintModelManager is None):
-          dam = crocoddyl.DifferentialActionModelContactFwdDynamics(state, 
-                                                                    actuation, 
-                                                                    crocoddyl.ContactModelMultiple(state, actuation.nu), 
-                                                                    crocoddyl.CostModelSum(state, nu=actuation.nu), 
-                                                                    inv_damping=0., 
-                                                                    enable_force=True)
-        else:
-          dam = crocoddyl.DifferentialActionModelContactFwdDynamics(state, 
-                                                                    actuation, 
-                                                                    crocoddyl.ContactModelMultiple(state, actuation.nu), 
-                                                                    crocoddyl.CostModelSum(state, nu=actuation.nu), 
-                                                                    constraintModelManager,
-                                                                    inv_damping=0., 
-                                                                    enable_force=True)
+      if(constraintModelManager is None):
+        dam = crocoddyl.DifferentialActionModelContactFwdDynamics(state, 
+                                                                  actuation, 
+                                                                  crocoddyl.ContactModelMultiple(state, actuation.nu), 
+                                                                  crocoddyl.CostModelSum(state, nu=actuation.nu), 
+                                                                  inv_damping=0., 
+                                                                  enable_force=True)
+      else:
+        dam = crocoddyl.DifferentialActionModelContactFwdDynamics(state, 
+                                                                  actuation, 
+                                                                  crocoddyl.ContactModelMultiple(state, actuation.nu), 
+                                                                  crocoddyl.CostModelSum(state, nu=actuation.nu), 
+                                                                  constraintModelManager,
+                                                                  inv_damping=0., 
+                                                                  enable_force=True)
     # Otherwise just create free DAM
     else:
       if(constraintModelManager is None):
@@ -220,7 +222,7 @@ class OptimalControlProblemClassical(OptimalControlProblemAbstract):
     if('collision' in self.WHICH_COSTS):
       collisionCost = self.create_collision_cost(state, actuation)
       terminalModel.differential.costs.addCost("collision", collisionCost, self.collisionCostWeightTerminal*self.dt)
-
+    
     # # Add armature
     # terminalModel.differential.armature = np.asarray(self.armature)   
   

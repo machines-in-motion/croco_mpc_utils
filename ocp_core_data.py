@@ -191,7 +191,7 @@ class OCPDataHandlerAbstract:
           print(self.ocp.runningModels[0].differential.contacts.contacts[ct_frame_name].contact.nc == 3)
           logger.error("Contact must be 1D or 3D !")
         # Check which reference frame is used 
-        if(self.ocp.runningModels[0].differential.contacts.contacts[ct_frame_name].contact.type == pin.pinocchio_pywrap.ReferenceFrame.LOCAL):
+        if(self.ocp.runningModels[0].differential.contacts.contacts[ct_frame_name].contact.type == pin.ReferenceFrame.LOCAL):
           PIN_REF_FRAME = pin.LOCAL
         else:
           PIN_REF_FRAME = pin.LOCAL_WORLD_ALIGNED
