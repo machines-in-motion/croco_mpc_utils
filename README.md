@@ -7,6 +7,7 @@ Utilities for easy &amp; modular MPC prototyping using Crocoddyl. This package's
 - [crocoddyl](https://github.com/loco-3d/crocoddyl) (>=2.0)
 - [pinocchio](https://github.com/stack-of-tasks/pinocchio)
 - [eigenpy](https://github.com/stack-of-tasks/eigenpy)
+- [colmpc](https://github.com/agimus-project/colmpc) (for constrained OCPs)
 
 Standard python dependencies: matplotlib, numpy, logger, yaml, os, pathlib, setuptools
 

@@ -14,8 +14,11 @@ from croco_mpc_utils import pinocchio_utils
 
 import mim_solvers
 
+import os
+
 # Read YAML config file
-config = load_yaml_file('ocp_constraint.yml')
+config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ocp_constraint.yml')
+config = load_yaml_file(config_path)
 
 # Import robot model (pinocchio wrapper)
 robot  = load_pinocchio_wrapper('iiwa_convex')
